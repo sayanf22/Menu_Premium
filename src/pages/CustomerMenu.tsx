@@ -392,6 +392,11 @@ const CustomerMenu = () => {
     }
 
     try {
+      console.log('📝 Starting order placement...');
+      console.log('Restaurant ID:', restaurantId);
+      console.log('Table Number:', tableNumber);
+      console.log('Cart items:', cart);
+
       const orderNum = `ORD${Date.now().toString().slice(-6)}`;
       const orderItems = cart.map(item => ({
         id: item.id,
@@ -401,48 +406,33 @@ const CustomerMenu = () => {
         image_url: item.image_url
       }));
 
-      // Try RPC first, fallback to direct insert
-      let newOrder;
-      try {
-        const { data: rpcData, error: rpcError } = await supabase.rpc('create_order', {
-          p_restaurant_id: restaurantId,
-          p_table_number: tableNumber,
-          p_items: { items: orderItems },
-          p_order_number: orderNum,
-        });
+      console.log('Order number:', orderNum);
+      console.log('Order items:', orderItems);
 
-        if (rpcError) throw rpcError;
+      // Direct insert (skip RPC for better error messages)
+      console.log('💾 Inserting order directly...');
+      const { data: newOrder, error: insertError } = await supabase
+        .from("orders")
+        .insert([{
+          restaurant_id: restaurantId,
+          table_number: tableNumber,
+          items: { items: orderItems },
+          order_number: orderNum,
+          status: 'preparing'
+        }])
+        .select()
+        .single();
 
-        const { data: orderData } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("id", rpcData)
-          .single();
-        
-        newOrder = orderData;
-      } catch (rpcErr) {
-        console.log('RPC failed, using direct insert:', rpcErr);
-        
-        // Fallback: Direct insert
-        const { data: insertData, error: insertError } = await supabase
-          .from("orders")
-          .insert([{
-            restaurant_id: restaurantId,
-            table_number: tableNumber,
-            items: { items: orderItems },
-            order_number: orderNum,
-            status: 'preparing'  // Explicitly set to 'preparing'
-          }])
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        newOrder = insertData;
+      if (insertError) {
+        console.error('❌ Insert error:', insertError);
+        throw new Error(insertError.message || 'Failed to create order');
       }
 
       if (!newOrder) {
-        throw new Error('Failed to create order');
+        throw new Error('No order data returned');
       }
+
+      console.log('✅ Order created:', newOrder);
 
       // Add to active orders array
       setActiveOrders(prev => [...prev, newOrder]);
@@ -477,10 +467,18 @@ const CustomerMenu = () => {
       });
     } catch (err: any) {
       console.error("❌ Error placing order:", err);
+      console.error("Error details:", {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint
+      });
+      
       toast({
-        title: "Error",
-        description: err.message || "Failed to place order. Please try again.",
+        title: "Failed to create order",
+        description: err.message || "Please check your connection and try again.",
         variant: "destructive",
+        duration: 6000,
       });
     }
   };
