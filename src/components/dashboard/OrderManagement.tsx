@@ -18,17 +18,23 @@ interface Order {
 
 interface OrderManagementProps {
   restaurantId: string;
+  onNewOrder?: (order: Order) => void;
+  newOrderTrigger?: Order | null; // Receives new orders from parent
+  isVisible?: boolean; // Whether the component is currently visible
 }
 
-const OrderManagement = ({ restaurantId }: OrderManagementProps) => {
+const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible }: OrderManagementProps) => {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
+  const lastFetchTime = useRef<number>(0);
 
   // Sound and notification now handled at Dashboard level
 
   useEffect(() => {
+    // Always fetch fresh data when component mounts
+    console.log('🔄 OrderManagement: Component mounted, fetching orders');
     fetchOrders();
     subscribeToOrders();
 
@@ -40,21 +46,73 @@ const OrderManagement = ({ restaurantId }: OrderManagementProps) => {
     };
   }, [restaurantId]);
 
+  // Refetch when component becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      console.log('👁️ OrderManagement: Became visible, refetching orders');
+      fetchOrders();
+    }
+  }, [isVisible]);
+
+  // Handle new orders from parent (Dashboard realtime subscription)
+  useEffect(() => {
+    console.log('🔄 OrderManagement: newOrderTrigger changed', newOrderTrigger);
+    
+    if (newOrderTrigger && newOrderTrigger.id) {
+      console.log('📥 OrderManagement: Received new order from parent', newOrderTrigger);
+      console.log('📋 Current orders count:', orders.length);
+      
+      // Force immediate state update
+      setOrders(currentOrders => {
+        const exists = currentOrders.some(o => o.id === newOrderTrigger.id);
+        if (exists) {
+          console.log('⚠️ Order already in list, skipping');
+          return currentOrders;
+        }
+        console.log('✅ Adding new order to list from parent');
+        const newList = [newOrderTrigger, ...currentOrders];
+        console.log('📊 New orders count:', newList.length);
+        
+        // Also highlight the new order
+        setNewOrderIds(prev => new Set(prev).add(newOrderTrigger.id));
+        
+        // Remove highlight after 10 seconds
+        setTimeout(() => {
+          setNewOrderIds(prev => {
+            const updated = new Set(prev);
+            updated.delete(newOrderTrigger.id);
+            return updated;
+          });
+        }, 10000);
+        
+        return newList;
+      });
+    } else {
+      console.log('⚠️ OrderManagement: newOrderTrigger is null/undefined or missing id');
+    }
+  }, [newOrderTrigger]); // Watch for any changes to newOrderTrigger
+
   const fetchOrders = async () => {
     try {
-      console.log("Fetching orders for restaurant:", restaurantId);
+      console.log("📥 Fetching orders for restaurant:", restaurantId);
       const { data, error } = await supabase
         .from("orders")
         .select("*")
         .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: false });
 
-      console.log("Orders fetched:", { data, error });
+      console.log("✅ Orders fetched:", data?.length, "orders");
 
       if (error) throw error;
       setOrders(data || []);
+      
+      toast({
+        title: "Orders Refreshed",
+        description: `Loaded ${data?.length || 0} orders`,
+        duration: 2000,
+      });
     } catch (error: any) {
-      console.error("Error fetching orders:", error);
+      console.error("❌ Error fetching orders:", error);
       toast({
         title: "Error",
         description: "Failed to load orders",
@@ -66,45 +124,19 @@ const OrderManagement = ({ restaurantId }: OrderManagementProps) => {
   const subscribeToOrders = () => {
     // Clean up existing channel if any
     if (channelRef.current) {
-      console.log('🔕 Removing existing channel');
+      console.log('🔕 OrderManagement: Removing existing channel');
       supabase.removeChannel(channelRef.current);
     }
 
-    console.log('🔔 Setting up realtime subscription for restaurant:', restaurantId);
+    console.log('🔔 OrderManagement: Setting up UPDATE subscription for restaurant:', restaurantId);
 
     // Create a unique channel for this restaurant
-    const channelName = `restaurant-orders-${restaurantId}-${Date.now()}`;
-    console.log('📡 Channel name:', channelName);
+    // Only subscribe to UPDATE events (INSERT handled by Dashboard)
+    const channelName = `order-management-updates-${restaurantId}-${Date.now()}`;
+    console.log('📡 OrderManagement channel:', channelName);
 
     channelRef.current = supabase
       .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "orders",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        (payload) => {
-          console.log('🎉 NEW ORDER RECEIVED via Realtime!', payload);
-          console.log('📦 Order data:', payload.new);
-
-          // Optimistically add new order to state instead of refetching all
-          const newOrder = payload.new as Order;
-          setOrders(prev => [newOrder, ...prev]);
-          setNewOrderIds(prev => new Set(prev).add(newOrder.id));
-
-          // Remove highlight after 10 seconds
-          setTimeout(() => {
-            setNewOrderIds(prev => {
-              const updated = new Set(prev);
-              updated.delete(newOrder.id);
-              return updated;
-            });
-          }, 10000);
-        }
-      )
       .on(
         "postgres_changes",
         {
@@ -114,7 +146,7 @@ const OrderManagement = ({ restaurantId }: OrderManagementProps) => {
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
-          console.log('📝 Order updated via Realtime:', payload);
+          console.log('📝 OrderManagement: Order updated via Realtime:', payload);
           // Optimistically update order in state
           const updatedOrder = payload.new as Order;
           setOrders(prev => prev.map(order =>
@@ -123,19 +155,14 @@ const OrderManagement = ({ restaurantId }: OrderManagementProps) => {
         }
       )
       .subscribe((status, err) => {
-        console.log('🔔 Realtime subscription status:', status);
+        console.log('🔔 OrderManagement subscription status:', status);
         if (err) {
           console.error('❌ Subscription error:', err);
         }
 
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Realtime connected successfully!');
-          console.log('👂 Listening for orders on restaurant:', restaurantId);
-          toast({
-            title: "✅ Connected",
-            description: "Listening for new orders...",
-            duration: 3000,
-          });
+          console.log('✅ OrderManagement realtime connected!');
+          console.log('👂 Listening for order updates on restaurant:', restaurantId);
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Realtime connection error');
           toast({
@@ -205,9 +232,19 @@ const OrderManagement = ({ restaurantId }: OrderManagementProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Order Management</h2>
-        <p className="text-muted-foreground">Track and manage customer orders in real-time</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold mb-2">Order Management</h2>
+          <p className="text-muted-foreground">Track and manage customer orders in real-time</p>
+        </div>
+        <Button 
+          onClick={fetchOrders} 
+          variant="outline"
+          className="gap-2"
+        >
+          <Package className="h-4 w-4" />
+          Refresh Orders
+        </Button>
       </div>
 
       <div className="grid gap-4">

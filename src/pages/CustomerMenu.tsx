@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { OrderAnimation } from "@/components/OrderAnimation";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MenuItemSkeleton } from "@/components/MenuItemSkeleton";
+import { MenuItemCard } from "@/components/ui/menu-item-card";
 import { motion } from "framer-motion";
 
 const CustomerMenu = () => {
@@ -194,13 +195,15 @@ const CustomerMenu = () => {
     }
   };
 
+  // Start realtime subscription when there are active orders
   useEffect(() => {
-    const orderIdsStr = localStorage.getItem(`orders_${restaurantId}_${sessionId}`);
-    if (orderIdsStr) {
+    // Only subscribe if we have active orders
+    if (activeOrders.length > 0) {
+      console.log('🔔 Starting realtime subscription for', activeOrders.length, 'orders');
       const cleanup = subscribeToOrderUpdates();
       return cleanup;
     }
-  }, [restaurantId, sessionId]);
+  }, [activeOrders.length, restaurantId, sessionId]);
 
   // Removed scroll tracking since we're showing one category at a time
 
@@ -310,12 +313,23 @@ const CustomerMenu = () => {
             return prev;
           });
           
-          // When order is completed, show toast
-          if (payload.new.status === "completed") {
+          // Show instant notification based on status change
+          if (payload.new.status === "completed" && payload.old.status !== "completed") {
+            // Play a sound or vibration if available
+            if ('vibrate' in navigator) {
+              navigator.vibrate([200, 100, 200]);
+            }
+            
             toast({
-              title: "✅ Order Completed!",
-              description: `Order #${payload.new.order_number} is completed!`,
-              duration: 5000,
+              title: "🎉 Order Ready!",
+              description: `Order #${payload.new.order_number} is ready for pickup!`,
+              duration: 8000,
+            });
+          } else if (payload.new.status === "preparing" && payload.old.status === "pending") {
+            toast({
+              title: "👨‍🍳 Order Confirmed",
+              description: `Order #${payload.new.order_number} is being prepared`,
+              duration: 4000,
             });
           }
         }
@@ -450,14 +464,16 @@ const CustomerMenu = () => {
       
       console.log('✅ Order placed successfully:', newOrder);
       console.log('📦 Active orders:', [...activeOrders, newOrder]);
+      console.log('🔔 Realtime subscription will start automatically');
       
       setCart([]);
       setShowCartDialog(false);
       setShowOrderConfirmation(true);
       
       toast({
-        title: "Order placed!",
-        description: `Order #${orderNum} added to your orders`,
+        title: "🎉 Order placed!",
+        description: `Order #${orderNum} is being prepared. You'll get notified when it's ready!`,
+        duration: 5000,
       });
     } catch (err: any) {
       console.error("❌ Error placing order:", err);
@@ -637,13 +653,22 @@ const CustomerMenu = () => {
         </Button>
       </div>
 
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <div className="text-center mb-6 sm:mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">{restaurantName || "Our Menu"}</h1>
+      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-10">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-8 sm:mb-12"
+        >
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
+            {restaurantName || "Our Menu"}
+          </h1>
           {restaurantDescription && (
-            <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-2">{restaurantDescription}</p>
+            <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto px-2">
+              {restaurantDescription}
+            </p>
           )}
-        </div>
+        </motion.div>
 
         {/* Category Filter Badge */}
         {selectedCategoryFilter && (
@@ -663,24 +688,38 @@ const CustomerMenu = () => {
         )}
         
         {/* Accordion Style Categories */}
-        <div className="space-y-2">
-          {visibleCategories.map((category) => {
+        <div className="space-y-4">
+          {visibleCategories.map((category, categoryIndex) => {
             const isExpanded = expandedCategories.has(category.id);
             const categoryItems = groupedItems[category.id] || [];
             const filteredItems = categoryItems;
 
             return (
-              <div key={category.id} className="border border-border rounded-lg overflow-hidden bg-card">
+              <motion.div
+                key={category.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: categoryIndex * 0.1 }}
+                className="border border-border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow"
+              >
                 {/* Category Header - Clickable */}
                 <button
                   onClick={() => toggleCategory(category.id)}
-                  className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-muted/50 transition-colors"
+                  className="w-full flex items-center justify-between p-5 sm:p-6 hover:bg-muted/50 transition-colors group"
                 >
-                  <h2 className="text-lg sm:text-xl font-bold text-foreground">
-                    {category.name}
-                  </h2>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">{category.name.charAt(0)}</span>
+                    </div>
+                    <div className="text-left">
+                      <h2 className="text-lg sm:text-xl font-bold text-foreground">
+                        {category.name}
+                      </h2>
+                      <p className="text-xs text-muted-foreground">{filteredItems.length} items</p>
+                    </div>
+                  </div>
                   <ChevronDown 
-                    className={`h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground transition-transform duration-300 ${
+                    className={`h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground transition-transform duration-300 group-hover:text-foreground ${
                       isExpanded ? 'rotate-180' : ''
                     }`}
                   />
@@ -701,131 +740,57 @@ const CustomerMenu = () => {
                   }}
                 >
                   {isExpanded && (
-                    <div className="p-3 sm:p-4 grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="p-4 sm:p-6 grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {isLoadingItems ? (
                         Array.from({ length: 3 }).map((_, i) => <MenuItemSkeleton key={i} />)
                       ) : (
                         filteredItems.map((item: any, index: number) => (
-                          <motion.div
+                          <MenuItemCard
                             key={item.id}
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true, margin: "-50px" }}
-                            transition={{ 
-                              duration: 0.5, 
-                              delay: index * 0.08,
-                              ease: [0.25, 0.1, 0.25, 1]
-                            }}
-                          >
-                            <Card 
-                              className="overflow-hidden hover:shadow-lg transition-all duration-300"
-                            >
-                            <div className="relative">
-                              <img 
-                                src={item.image_url} 
-                                alt={item.name} 
-                                className={`w-full h-36 sm:h-40 object-cover transition-all ${!item.is_available ? 'grayscale opacity-60' : ''}`}
-                                loading="lazy"
-                              />
-                              {!item.is_available && (
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                  <Badge variant="destructive" className="text-xs sm:text-sm px-4 py-2 font-bold shadow-xl">
-                                    Unavailable
-                                  </Badge>
-                                </div>
-                              )}
-                            </div>
-                            <div className="p-3 sm:p-4">
-                              <h3 className={`font-bold text-sm sm:text-base mb-1 ${!item.is_available ? 'text-muted-foreground' : ''}`}>
-                                {item.name}
-                              </h3>
-                              <p className="text-xs mb-2 sm:mb-3 line-clamp-2 text-muted-foreground">{item.description}</p>
-                              <div className="flex justify-between items-center gap-2">
-                                <span className={`text-base sm:text-lg font-bold ${!item.is_available ? 'text-muted-foreground' : 'text-primary'}`}>
-                                  {formatINR(item.price)}
-                                </span>
-                                <Button 
-                                  onClick={() => addToCart(item)} 
-                                  disabled={!item.is_available}
-                                  variant={item.is_available ? "hero" : "outline"}
-                                  size="sm"
-                                  className="text-xs"
-                                >
-                                  {item.is_available ? 'Add' : 'Unavailable'}
-                                </Button>
-                              </div>
-                            </div>
-                          </Card>
-                          </motion.div>
+                            imageUrl={item.image_url}
+                            name={item.name}
+                            price={item.price}
+                            quantity={item.description || ""}
+                            onAdd={() => addToCart(item)}
+                            isAvailable={item.is_available}
+                          />
                         ))
                       )}
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
 
         {uncategorizedItems.length > 0 && (
-          <div className="mb-8 sm:mb-12">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 sm:mb-6 text-primary">More Items</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mb-8 sm:mb-12 mt-8"
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">+</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">More Items</h2>
+            </div>
             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {uncategorizedItems.map((item: any, index: number) => (
-                <motion.div
+                <MenuItemCard
                   key={item.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{ 
-                    duration: 0.5, 
-                    delay: index * 0.08,
-                    ease: [0.25, 0.1, 0.25, 1]
-                  }}
-                >
-                  <Card 
-                    className="overflow-hidden hover:shadow-[var(--shadow-medium)] transition-all" 
-                  >
-                  <div className="relative">
-                    <img 
-                      src={item.image_url} 
-                      alt={item.name} 
-                      className={`w-full h-40 sm:h-48 object-cover transition-all ${!item.is_available ? 'grayscale opacity-60' : ''}`}
-                      loading="lazy"
-                    />
-                    {!item.is_available && (
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <Badge variant="destructive" className="text-xs sm:text-sm md:text-base px-4 sm:px-5 py-2 sm:py-3 font-bold shadow-xl">
-                          Currently Unavailable
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 sm:p-4">
-                    <h3 className={`font-bold text-base sm:text-lg mb-1 sm:mb-2 ${!item.is_available ? 'text-muted-foreground' : ''}`}>
-                      {item.name}
-                    </h3>
-                    <p className="text-xs sm:text-sm mb-3 sm:mb-4 line-clamp-2 text-muted-foreground">{item.description}</p>
-                    <div className="flex justify-between items-center gap-2">
-                      <span className={`text-lg sm:text-xl font-bold ${!item.is_available ? 'text-muted-foreground' : 'text-primary'}`}>
-                        {formatINR(item.price)}
-                      </span>
-                      <Button 
-                        onClick={() => addToCart(item)} 
-                        disabled={!item.is_available}
-                        variant={item.is_available ? "hero" : "outline"}
-                        size="sm"
-                        className="text-xs sm:text-sm"
-                      >
-                        {item.is_available ? 'Add' : 'Unavailable'}
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-                </motion.div>
+                  imageUrl={item.image_url}
+                  name={item.name}
+                  price={item.price}
+                  quantity={item.description || ""}
+                  onAdd={() => addToCart(item)}
+                  isAvailable={item.is_available}
+                />
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 

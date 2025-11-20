@@ -24,6 +24,9 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
+  const [signupCode, setSignupCode] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -33,6 +36,33 @@ const Auth = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       navigate("/dashboard");
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+
+      setResetEmailSent(true);
+      toast({
+        title: "Email Sent!",
+        description: "Check your email for the password reset link",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reset email",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,6 +78,14 @@ const Auth = () => {
       authSchema.parse(validationData);
 
       if (isSignUp) {
+        // Validate signup code first
+        const { data: isValidCode, error: codeError } = await supabase
+          .rpc('validate_signup_code', { p_code: signupCode });
+
+        if (codeError || !isValidCode) {
+          throw new Error("Invalid or expired signup code. Please contact support for a valid code.");
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -55,6 +93,7 @@ const Auth = () => {
             emailRedirectTo: `${window.location.origin}/dashboard`,
             data: {
               name: restaurantName,
+              signup_code: signupCode,
             }
           }
         });
@@ -62,6 +101,12 @@ const Auth = () => {
         if (error) throw error;
 
         if (data.user) {
+          // Mark the code as used
+          await supabase.rpc('mark_signup_code_used', { 
+            p_code: signupCode, 
+            p_user_id: data.user.id 
+          });
+
           toast({
             title: "Account created!",
             description: "Welcome to QuickMenu. Setting up your dashboard...",
@@ -119,27 +164,98 @@ const Auth = () => {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">
-            {isSignUp ? "Create Your Account" : "Welcome Back"}
+            {showForgotPassword ? "Reset Password" : isSignUp ? "Create Your Account" : "Welcome Back"}
           </CardTitle>
           <CardDescription>
-            {isSignUp 
-              ? "Start managing your restaurant menu in minutes" 
-              : "Sign in to access your dashboard"}
+            {showForgotPassword 
+              ? "Enter your email to receive a password reset link"
+              : isSignUp 
+                ? "Start managing your restaurant menu in minutes" 
+                : "Sign in to access your dashboard"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleAuth} className="space-y-4">
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Restaurant Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Your Restaurant"
-                  value={restaurantName}
-                  onChange={(e) => setRestaurantName(e.target.value)}
-                  required={isSignUp}
-                />
+          {showForgotPassword ? (
+            resetEmailSent ? (
+              <div className="text-center space-y-4">
+                <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    ✓ Password reset email sent! Check your inbox.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setResetEmailSent(false);
+                  }}
+                  className="w-full"
+                >
+                  Back to Sign In
+                </Button>
               </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@restaurant.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  variant="hero" 
+                  size="lg"
+                  disabled={loading}
+                >
+                  {loading ? "Sending..." : "Send Reset Link"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="w-full"
+                >
+                  Back to Sign In
+                </Button>
+              </form>
+            )
+          ) : (
+            <form onSubmit={handleAuth} className="space-y-4">
+            {isSignUp && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Restaurant Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Your Restaurant"
+                    value={restaurantName}
+                    onChange={(e) => setRestaurantName(e.target.value)}
+                    required={isSignUp}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signupCode">Signup Code</Label>
+                  <Input
+                    id="signupCode"
+                    placeholder="Enter your signup code"
+                    value={signupCode}
+                    onChange={(e) => setSignupCode(e.target.value.toUpperCase())}
+                    required={isSignUp}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Contact support to get your premium access code
+                  </p>
+                </div>
+              </>
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -173,18 +289,32 @@ const Auth = () => {
               {loading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
             </Button>
           </form>
+          )}
           
-          <div className="mt-6 text-center text-sm">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-primary hover:underline"
-            >
-              {isSignUp 
-                ? "Already have an account? Sign in" 
-                : "Don't have an account? Sign up"}
-            </button>
-          </div>
+          {!showForgotPassword && (
+            <div className="mt-6 space-y-3 text-center text-sm">
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Forgot password?
+                </button>
+              )}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-primary hover:underline"
+                >
+                  {isSignUp 
+                    ? "Already have an account? Sign in" 
+                    : "Don't have an account? Sign up"}
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

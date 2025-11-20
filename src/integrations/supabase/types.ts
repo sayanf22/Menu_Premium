@@ -322,6 +322,45 @@ export type Database = {
         }
         Relationships: []
       }
+      signup_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          current_uses: number | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          is_used: boolean | null
+          max_uses: number | null
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          current_uses?: number | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          max_uses?: number | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          current_uses?: number | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          max_uses?: number | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -336,6 +375,10 @@ export type Database = {
         }
         Returns: string
       }
+      mark_signup_code_used: {
+        Args: { p_code: string; p_user_id: string }
+        Returns: boolean
+      }
       toggle_restaurant_status: {
         Args: {
           p_admin_email: string
@@ -344,6 +387,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      validate_signup_code: { Args: { p_code: string }; Returns: boolean }
       verify_admin_password: {
         Args: { p_email: string; p_password: string }
         Returns: boolean

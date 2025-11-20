@@ -5,12 +5,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { setupVisibilityOptimization } from "@/lib/realtimeOptimization";
-import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+import DashboardWithSidebar from "./pages/DashboardWithSidebar";
 import CustomerMenu from "./pages/CustomerMenu";
 import AdminLogin from "./pages/AdminLogin";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminDashboardWithSidebar from "./pages/AdminDashboardWithSidebar";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Configure React Query with optimized defaults
@@ -40,12 +40,13 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/dashboard" element={<DashboardWithSidebar />} />
             <Route path="/menu/:restaurantId" element={<CustomerMenu />} />
             <Route path="/admindashboard/login" element={<AdminLogin />} />
-            <Route path="/admindashboard" element={<AdminDashboard />} />
+            <Route path="/admindashboard" element={<AdminDashboardWithSidebar />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

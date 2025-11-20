@@ -4,6 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
     <title>AddMenu - QR Menu & Ordering System</title>
+    
+    <!-- OneSignal Push Notifications -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      console.log('🔔 OneSignal script loading...');
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        console.log('🔔 OneSignal initializing...');
+        try {
+          await OneSignal.init({
+            appId: "30e2fbc2-8319-4e46-9cb3-2e9c24b2201c",
+            safari_web_id: "web.onesignal.auto.185a3882-a3fa-4e4c-9216-d752294e35fc",
+            allowLocalhostAsSecureOrigin: true,
+            notifyButton: {
+              enable: true,
+              size: 'medium',
+              position: 'bottom-right',
+              showCredit: false,
+            }
+          });
+          
+          console.log('✅ OneSignal initialized successfully!');
+          console.log('OneSignal object:', OneSignal);
+        } catch (error) {
+          console.error('❌ OneSignal initialization error:', error);
+        }
+      });
+    </script>
     <meta name="description" content="Modern QR ordering system for restaurants. Contactless menu browsing, real-time order tracking, and customer feedback." />
     <meta name="author" content="AddMenu" />
 
