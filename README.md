@@ -73,11 +73,21 @@ Visit: http://localhost:8080
 
 ### 1. Environment Variables
 
-Create `.env` file:
+Create `.env` file (copy from `.env.example`):
 ```env
-VITE_SUPABASE_PROJECT_ID="your_project_id"
-VITE_SUPABASE_PUBLISHABLE_KEY="your_publishable_key"
-VITE_SUPABASE_URL="https://your_project.supabase.co"
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key_here
+```
+
+**Important Notes:**
+- ❌ Do NOT use quotes around the values
+- ✅ Use the anon key (JWT token starting with `eyJ...`)
+- ✅ Get these from: Supabase Dashboard → Project Settings → API
+
+**Example:**
+```env
+VITE_SUPABASE_URL=https://pnakpaqvjxzoekrneumk.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 ### 2. Database Setup
@@ -306,6 +316,40 @@ Look for: "📦 Realtime order update received"
 - Client-side image compression (no server load)
 - Smart caching & indexing
 - Targeted realtime subscriptions
+
+---
+
+## 🚀 Deployment
+
+### Vercel / Netlify
+
+1. **Set Environment Variables** in your deployment platform:
+   ```
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key_here
+   ```
+
+2. **Update OneSignal Domain** in `index.html`:
+   - Add your production domain to the `isProduction` check
+   - Or configure OneSignal to allow your domain
+
+3. **Deploy**:
+   ```bash
+   npm run build
+   ```
+
+### Common Deployment Errors
+
+**Error: `supabaseUrl is required`**
+- ✅ Check environment variables are set correctly
+- ✅ Remove quotes from .env values
+- ✅ Use anon key (not publishable key format)
+- ✅ Restart dev server after changing .env
+
+**Error: `OneSignal initialization error`**
+- ✅ Add your domain to allowed domains in `index.html`
+- ✅ Or disable OneSignal for non-production environments
+- ✅ This won't affect core functionality
 
 ---
 
