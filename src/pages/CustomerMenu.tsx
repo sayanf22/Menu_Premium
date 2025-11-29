@@ -913,13 +913,19 @@ const CustomerMenu = () => {
 
       {/* Cart Dialog */}
       <Dialog open={showCartDialog} onOpenChange={setShowCartDialog}>
-        <DialogContent className="max-w-lg w-[95vw] p-0 gap-0 rounded-3xl overflow-hidden border-0 shadow-2xl bg-white dark:bg-zinc-950 z-[200]">
-          <DialogHeader className="p-5 pb-4 bg-gradient-to-r from-red-500 to-orange-500">
-            <DialogTitle className="text-xl font-bold text-white flex items-center gap-3">
+        <DialogContent className="max-w-lg w-[95vw] p-0 gap-0 rounded-3xl overflow-hidden border-0 shadow-2xl bg-white dark:bg-zinc-950 z-[200] [&>button]:hidden">
+          <DialogHeader className="p-5 pb-4 bg-gradient-to-r from-red-500 to-orange-500 relative">
+            <DialogTitle className="text-xl font-bold text-white flex items-center gap-3 pr-10">
               <ShoppingCart className="w-6 h-6" />
               Your Cart
-              <Badge className="bg-white/20 text-white border-0 ml-auto">{totalItems}</Badge>
+              <Badge className="bg-white/20 text-white border-0">{totalItems}</Badge>
             </DialogTitle>
+            <button 
+              onClick={() => setShowCartDialog(false)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
           </DialogHeader>
           
           {cart.length === 0 ? (
@@ -1099,9 +1105,9 @@ const CustomerMenu = () => {
             <h2 className="text-2xl font-bold text-white">How was your meal?</h2>
             <p className="text-white/80 text-sm mt-1">Your feedback helps us improve</p>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {/* Emoji Rating */}
-            <div className="flex justify-center gap-3 mb-6">
+            <div className="flex justify-between sm:justify-center gap-1 sm:gap-3 mb-6 px-2 sm:px-0">
               {[
                 { value: 1, emoji: '😞', label: 'Bad' },
                 { value: 2, emoji: '😕', label: 'Okay' },
@@ -1111,22 +1117,22 @@ const CustomerMenu = () => {
               ].map(({ value, emoji, label }) => (
                 <motion.button 
                   key={value} 
-                  whileHover={{ scale: 1.2, y: -5 }} 
+                  whileHover={{ scale: 1.1, y: -3 }} 
                   whileTap={{ scale: 0.9 }} 
                   onClick={() => setRating(value)} 
-                  className={`flex flex-col items-center p-2 rounded-2xl transition-all ${
+                  className={`flex flex-col items-center p-1.5 sm:p-2 rounded-xl sm:rounded-2xl transition-all min-w-[52px] sm:min-w-[60px] ${
                     rating === value 
                       ? 'bg-amber-100 dark:bg-amber-500/20 ring-2 ring-amber-500' 
                       : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   }`}
                 >
-                  <span className={`text-4xl transition-all ${rating === value ? 'scale-110' : 'grayscale opacity-60'}`}>{emoji}</span>
-                  <span className={`text-xs mt-1 font-medium ${rating === value ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'}`}>{label}</span>
+                  <span className={`text-2xl sm:text-4xl transition-all ${rating === value ? 'scale-110' : 'grayscale opacity-60'}`}>{emoji}</span>
+                  <span className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 font-medium ${rating === value ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'}`}>{label}</span>
                 </motion.button>
               ))}
             </div>
-            <Textarea placeholder="Tell us more about your experience (optional)" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="rounded-2xl resize-none mb-4 border-2 focus:border-amber-500" />
-            <Button onClick={submitFeedback} disabled={rating === 0} className="w-full h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:from-zinc-300 disabled:to-zinc-400 text-white rounded-2xl font-bold text-lg shadow-lg shadow-amber-500/30 disabled:shadow-none transition-all">
+            <Textarea placeholder="Tell us more about your experience (optional)" value={comment} onChange={(e) => setComment(e.target.value)} rows={3} className="rounded-xl sm:rounded-2xl resize-none mb-4 border-2 focus:border-amber-500 text-sm sm:text-base" />
+            <Button onClick={submitFeedback} disabled={rating === 0} className="w-full h-12 sm:h-14 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:from-zinc-300 disabled:to-zinc-400 text-white rounded-xl sm:rounded-2xl font-bold text-base sm:text-lg shadow-lg shadow-amber-500/30 disabled:shadow-none transition-all">
               Submit Feedback
             </Button>
             <button
@@ -1137,7 +1143,7 @@ const CustomerMenu = () => {
                 setActiveOrders([]);
                 setCurrentOrder(null);
               }}
-              className="w-full mt-3 text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 py-2"
+              className="w-full mt-2 sm:mt-3 text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 py-2"
             >
               Maybe later
             </button>
