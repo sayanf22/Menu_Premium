@@ -56,26 +56,34 @@ const DashboardWithSidebar = () => {
   const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastOrderCountRef = useRef<number>(0);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const dashboardLoadTimeRef = useRef<number>(Date.now()); // Track when dashboard loaded
+  const processedOrderIdsRef = useRef<Set<string>>(new Set()); // Track processed orders
+
+  // Helper to handle tab change and close mobile sidebar
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setOpen(false); // Close mobile sidebar
+  };
 
   const links = [
     {
       label: "Overview",
       href: "#stats",
       icon: <BarChart3 className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("stats"),
+      onClick: () => handleTabChange("stats"),
     },
     {
       label: "Menu",
       href: "#menu",
       icon: <MenuIcon className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("menu"),
+      onClick: () => handleTabChange("menu"),
     },
     {
       label: "Orders",
       href: "#orders",
       icon: <Package className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
       onClick: () => {
-        setActiveTab("orders");
+        handleTabChange("orders");
         setNewOrdersCount(0);
       },
       badge: newOrdersCount,
@@ -84,25 +92,25 @@ const DashboardWithSidebar = () => {
       label: "Feedback",
       href: "#feedback",
       icon: <MessageSquare className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("feedback"),
+      onClick: () => handleTabChange("feedback"),
     },
     {
       label: "Social Links",
       href: "#social",
       icon: <Share2 className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("social"),
+      onClick: () => handleTabChange("social"),
     },
     {
       label: "QR Code",
       href: "#qr",
       icon: <QrCode className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("qr"),
+      onClick: () => handleTabChange("qr"),
     },
     {
       label: "Profile",
       href: "#profile",
       icon: <Settings className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("profile"),
+      onClick: () => handleTabChange("profile"),
     },
   ];
 
@@ -149,40 +157,74 @@ const DashboardWithSidebar = () => {
           }
         });
       
-      // Fallback polling for orders
-      pollingIntervalRef.current = setInterval(async () => {
+      // IMPORTANT: Initialize order count FIRST before starting polling
+      // This prevents the sound from playing on page load/refresh
+      const initializeOrderCount = async () => {
         try {
           const { data, error } = await supabase
             .from("orders")
-            .select("id, order_number, table_number, items, status, created_at")
-            .eq("restaurant_id", restaurantId)
-            .order("created_at", { ascending: false });
+            .select("id")
+            .eq("restaurant_id", restaurantId);
           
-          if (error) return;
-          
-          if (data && data.length > lastOrderCountRef.current) {
-            const newOrders = data.slice(0, data.length - lastOrderCountRef.current);
-            
-            newOrders.forEach((order) => {
-              setNewOrdersCount(prev => prev + 1);
-              setNewOrderNotification(order as Order);
-              playPleasantNotificationSound();
-              
-              toast({
-                title: "🔔 New Order!",
-                description: `Order #${order.order_number} from Table ${order.table_number}`,
-                duration: 10000,
-              });
-            });
-          }
-          
-          if (data) {
+          if (!error && data) {
+            // Set the initial count so polling doesn't think existing orders are new
             lastOrderCountRef.current = data.length;
+            console.log('📊 Initialized order count:', data.length);
           }
         } catch (err) {
-          console.error('Polling error:', err);
+          console.error('Error initializing order count:', err);
         }
-      }, 3000);
+      };
+      
+      // Initialize first, then start polling after a delay
+      initializeOrderCount().then(() => {
+        // Start polling AFTER we have the initial count
+        pollingIntervalRef.current = setInterval(async () => {
+          try {
+            const { data, error } = await supabase
+              .from("orders")
+              .select("id, order_number, table_number, items, status, created_at")
+              .eq("restaurant_id", restaurantId)
+              .order("created_at", { ascending: false });
+            
+            if (error) return;
+            
+            // Only trigger notification if count increased AND we have initialized
+            if (data && data.length > lastOrderCountRef.current && lastOrderCountRef.current > 0) {
+              const newOrderCount = data.length - lastOrderCountRef.current;
+              const newOrders = data.slice(0, newOrderCount);
+              
+              newOrders.forEach((order) => {
+                // Use the same checks as handleNewOrder
+                const orderCreatedAt = new Date(order.created_at).getTime();
+                if (orderCreatedAt < dashboardLoadTimeRef.current) {
+                  return; // Skip old orders
+                }
+                if (processedOrderIdsRef.current.has(order.id)) {
+                  return; // Skip already processed
+                }
+                
+                processedOrderIdsRef.current.add(order.id);
+                setNewOrdersCount(prev => prev + 1);
+                setNewOrderNotification(order as Order);
+                playPleasantNotificationSound();
+                
+                toast({
+                  title: "🔔 New Order!",
+                  description: `Order #${order.order_number} from Table ${order.table_number}`,
+                  duration: 10000,
+                });
+              });
+            }
+            
+            if (data) {
+              lastOrderCountRef.current = data.length;
+            }
+          } catch (err) {
+            console.error('Polling error:', err);
+          }
+        }, 5000); // Increased to 5 seconds to reduce load
+      });
       
       return () => {
         if (cleanupOrders) cleanupOrders();
@@ -301,12 +343,23 @@ const DashboardWithSidebar = () => {
   };
 
   const handleNewOrder = (order: Order) => {
+    // Skip if this order was created before dashboard loaded (prevents sound on refresh)
+    const orderCreatedAt = new Date(order.created_at).getTime();
+    if (orderCreatedAt < dashboardLoadTimeRef.current) {
+      console.log('⏭️ Skipping old order (created before dashboard load):', order.order_number);
+      return;
+    }
+    
+    // Skip if we already processed this order (prevents duplicate sounds)
+    if (processedOrderIdsRef.current.has(order.id)) {
+      console.log('⏭️ Skipping already processed order:', order.order_number);
+      return;
+    }
+    
+    // Mark as processed
+    processedOrderIdsRef.current.add(order.id);
+    
     console.log('🎯 Dashboard: Handling new order', order);
-    console.log('📊 Current state:', { 
-      activeTab, 
-      newOrdersCount, 
-      lastNewOrder: lastNewOrder?.id 
-    });
     
     setNewOrdersCount(prev => prev + 1);
     setNewOrderNotification(order);
@@ -322,7 +375,7 @@ const DashboardWithSidebar = () => {
       duration: 10000,
     });
     
-    console.log('✅ Dashboard: State updated, order should propagate to OrderManagement');
+    console.log('✅ Dashboard: New order notification triggered');
   };
 
   const playPleasantNotificationSound = () => {
@@ -429,16 +482,16 @@ const DashboardWithSidebar = () => {
     >
       {/* Global New Order Notification */}
       {newOrderNotification && (
-        <Card className="fixed top-4 right-4 z-[100] w-96 shadow-2xl border-2 border-primary animate-in slide-in-from-top-4 duration-500">
-          <CardHeader className="pb-3 bg-primary/5">
+        <Card className="fixed top-16 md:top-4 left-4 right-4 md:left-auto md:right-4 z-[100] md:w-96 shadow-2xl border-2 border-primary animate-in slide-in-from-top-4 duration-500">
+          <CardHeader className="pb-3 bg-primary/5 p-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center animate-pulse">
-                  <Bell className="h-6 w-6 text-primary-foreground" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-primary rounded-full flex items-center justify-center animate-pulse">
+                  <Bell className="h-5 w-5 md:h-6 md:w-6 text-primary-foreground" />
                 </div>
                 <div>
-                  <CardTitle className="text-xl">🔔 New Order!</CardTitle>
-                  <p className="text-sm text-muted-foreground">Order #{newOrderNotification.order_number}</p>
+                  <CardTitle className="text-lg md:text-xl">🔔 New Order!</CardTitle>
+                  <p className="text-xs md:text-sm text-muted-foreground">Order #{newOrderNotification.order_number}</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={dismissNotification} className="h-8 w-8">
@@ -446,31 +499,31 @@ const DashboardWithSidebar = () => {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="pt-3 p-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Table Number:</span>
-                <Badge variant="default" className="text-base px-3 py-1">
+                <Badge variant="default" className="text-sm md:text-base px-2 md:px-3 py-1">
                   {newOrderNotification.table_number}
                 </Badge>
               </div>
               <div className="border-t pt-3">
                 <p className="text-sm font-medium mb-2">Items:</p>
-                <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="space-y-1 text-xs md:text-sm text-muted-foreground max-h-32 overflow-y-auto">
                   {newOrderNotification.items?.items?.map((item: any, idx: number) => (
                     <div key={idx} className="flex justify-between">
-                      <span>{item.name} x{item.quantity || 1}</span>
-                      <span>₹{(item.price * (item.quantity || 1)).toFixed(2)}</span>
+                      <span className="truncate mr-2">{item.name} x{item.quantity || 1}</span>
+                      <span className="flex-shrink-0">₹{(item.price * (item.quantity || 1)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
               </div>
               <Button 
                 onClick={() => {
-                  setActiveTab("orders");
+                  handleTabChange("orders");
                   dismissNotification();
                 }} 
-                className="w-full mt-4" 
+                className="w-full mt-3" 
                 variant="default"
               >
                 View Order
@@ -503,6 +556,7 @@ const DashboardWithSidebar = () => {
           <div className="space-y-2">
             <div
               onClick={() => {
+                setOpen(false); // Close mobile sidebar
                 const testOrder: Order = {
                   id: 'test-' + Date.now(),
                   order_number: 'TEST' + Date.now().toString().slice(-4),
@@ -540,7 +594,10 @@ const DashboardWithSidebar = () => {
               </motion.span>
             </div>
             <div
-              onClick={handleSignOut}
+              onClick={() => {
+                setOpen(false); // Close mobile sidebar
+                handleSignOut();
+              }}
               className="flex items-center justify-start gap-2 group/sidebar py-2 cursor-pointer"
             >
               <LogOut className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
@@ -615,7 +672,7 @@ const Dashboard = ({
   console.log('🎨 Dashboard render:', { activeTab, hasNewOrder: !!newOrderTrigger });
   return (
     <div className="flex flex-1 overflow-hidden">
-      <div className="p-2 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full overflow-y-auto">
+      <div className="p-4 md:p-10 md:rounded-tl-2xl border-t md:border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-4 flex-1 w-full overflow-y-auto">
         {activeTab === "stats" && <StatsOverview restaurantId={restaurantId} />}
         {activeTab === "menu" && <MenuManagement restaurantId={restaurantId} />}
         

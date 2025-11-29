@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit2, Trash2, FolderPlus } from "lucide-react";
+import { Plus, Edit2, Trash2, FolderPlus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { uploadToR2WithProgress, validateFile } from "@/lib/r2Upload";
 
 interface MenuItem {
   id: string;
@@ -48,6 +49,8 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
     price: "",
     category_id: "",
   });
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -207,22 +210,26 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const fileName = `${restaurantId}/${Date.now()}.jpg`; // Always use .jpg for compressed images
-
-    const { error: uploadError } = await supabase.storage
-      .from("menu-images")
-      .upload(fileName, file, { 
-        upsert: false,
-        contentType: 'image/jpeg'
-      });
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from("menu-images")
-      .getPublicUrl(fileName);
-
-    return publicUrl;
+    setIsUploading(true);
+    setUploadProgress(0);
+    
+    try {
+      // Upload to Cloudflare R2
+      const result = await uploadToR2WithProgress(
+        file,
+        "menu-items",
+        (progress) => setUploadProgress(progress)
+      );
+      
+      if (!result.success || !result.publicUrl) {
+        throw new Error(result.error || "Upload failed");
+      }
+      
+      return result.publicUrl;
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -348,17 +355,17 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold mb-2">Menu Management</h2>
-          <p className="text-muted-foreground">Add and manage your menu items and categories</p>
+          <h2 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Menu Management</h2>
+          <p className="text-sm md:text-base text-muted-foreground">Add and manage your menu items and categories</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <FolderPlus className="h-4 w-4 mr-2" />
-                Add Category
+              <Button variant="outline" className="flex-1 sm:flex-none text-xs sm:text-sm">
+                <FolderPlus className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">Add </span>Category
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -386,9 +393,9 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button variant="hero">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Menu Item
+              <Button variant="hero" className="flex-1 sm:flex-none text-xs sm:text-sm">
+                <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+                <span className="hidden xs:inline">Add </span>Item
               </Button>
             </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -458,8 +465,22 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" variant="hero" className="w-full" disabled={loading}>
-                {loading ? "Saving..." : editingItem ? "Update Item" : "Add Item"}
+              {isUploading && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading image... {uploadProgress}%
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <Button type="submit" variant="hero" className="w-full" disabled={loading || isUploading}>
+                {loading || isUploading ? "Saving..." : editingItem ? "Update Item" : "Add Item"}
               </Button>
             </form>
           </DialogContent>
@@ -468,17 +489,17 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
       </div>
 
       {categories.length > 0 && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Menu Categories</h3>
-          <div className="flex flex-wrap gap-3">
+        <Card className="p-4 md:p-6">
+          <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Menu Categories</h3>
+          <div className="flex flex-wrap gap-2 md:gap-3">
             {categories.map(cat => (
-              <div key={cat.id} className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-lg border border-primary/20">
+              <div key={cat.id} className="flex items-center gap-1.5 md:gap-2 bg-primary/10 text-primary px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg border border-primary/20 text-sm md:text-base">
                 <span className="font-medium">{cat.name}</span>
-                <span className="text-sm opacity-70">({groupedItems[cat.id]?.length || 0})</span>
+                <span className="text-xs md:text-sm opacity-70">({groupedItems[cat.id]?.length || 0})</span>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-6 w-6 hover:bg-destructive/20 hover:text-destructive"
+                  className="h-5 w-5 md:h-6 md:w-6 hover:bg-destructive/20 hover:text-destructive"
                   onClick={() => deleteCategory(cat.id)}
                 >
                   <Trash2 className="h-3 w-3" />

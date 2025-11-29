@@ -232,15 +232,15 @@ const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold mb-2">Order Management</h2>
-          <p className="text-muted-foreground">Track and manage customer orders in real-time</p>
+          <h2 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Order Management</h2>
+          <p className="text-sm md:text-base text-muted-foreground">Track and manage customer orders in real-time</p>
         </div>
         <Button 
           onClick={fetchOrders} 
           variant="outline"
-          className="gap-2"
+          className="gap-2 w-full sm:w-auto"
         >
           <Package className="h-4 w-4" />
           Refresh Orders
@@ -264,47 +264,47 @@ const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible 
                 ${isNew ? 'ring-4 ring-orange-500/50 animate-pulse' : ''}
               `}
             >
-              <CardHeader>
-                <div className="flex justify-between items-start">
+              <CardHeader className="p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
                   <div className="flex-1">
-                    <CardTitle className={`flex items-center gap-3 ${completed ? 'text-2xl' : 'text-3xl font-bold'}`}>
-                      {isNew && <Bell className="h-6 w-6 text-orange-500 animate-bounce" />}
-                      <Package className={`${completed ? 'h-5 w-5' : 'h-7 w-7'} ${completed ? 'text-muted-foreground' : 'text-primary'}`} />
+                    <CardTitle className={`flex items-center gap-2 md:gap-3 ${completed ? 'text-xl md:text-2xl' : 'text-2xl md:text-3xl font-bold'}`}>
+                      {isNew && <Bell className="h-5 w-5 md:h-6 md:w-6 text-orange-500 animate-bounce" />}
+                      <Package className={`${completed ? 'h-4 w-4 md:h-5 md:w-5' : 'h-5 w-5 md:h-7 md:w-7'} ${completed ? 'text-muted-foreground' : 'text-primary'}`} />
                       <span className={completed ? 'text-muted-foreground' : 'text-foreground'}>
                         Order #{order.order_number}
                       </span>
                     </CardTitle>
-                    <p className={`${completed ? 'text-sm' : 'text-lg font-semibold'} mt-2 ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
+                    <p className={`${completed ? 'text-sm' : 'text-base md:text-lg font-semibold'} mt-1 md:mt-2 ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
                       Table {order.table_number}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <Badge className={`${getStatusColor(order.status)} border-2 px-3 py-1 text-sm font-bold`}>
+                  <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0 w-full sm:w-auto">
+                    <Badge className={`${getStatusColor(order.status)} border-2 px-2 md:px-3 py-1 text-xs md:text-sm font-bold`}>
                       {order.status.toUpperCase()}
                     </Badge>
-                    <p className={`text-xs mt-2 flex items-center gap-1 justify-end ${completed ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    <p className={`text-xs mt-0 sm:mt-2 flex items-center gap-1 ${completed ? 'text-muted-foreground' : 'text-foreground'}`}>
                       <Clock className="h-3 w-3" />
                       {new Date(order.created_at).toLocaleString()}
                     </p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-4 md:p-6 pt-0 md:pt-0">
                 <div>
-                  <h4 className={`font-semibold mb-3 ${completed ? 'text-sm' : 'text-lg'} ${completed ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  <h4 className={`font-semibold mb-2 md:mb-3 ${completed ? 'text-sm' : 'text-base md:text-lg'} ${completed ? 'text-muted-foreground' : 'text-foreground'}`}>
                     Items:
                   </h4>
-                  <ul className="space-y-2">
+                  <ul className="space-y-1.5 md:space-y-2">
                     {order.items?.items?.map((item: any, index: number) => (
                       <li
                         key={index}
-                        className={`flex justify-between items-center ${completed ? 'text-sm' : 'text-lg font-medium'} ${completed ? 'text-muted-foreground' : 'text-foreground'}`}
+                        className={`flex justify-between items-center ${completed ? 'text-sm' : 'text-base md:text-lg font-medium'} ${completed ? 'text-muted-foreground' : 'text-foreground'}`}
                       >
                         <span className="flex items-center gap-2">
-                          <span className={`${completed ? 'text-base' : 'text-xl'}`}>•</span>
+                          <span className={`${completed ? 'text-base' : 'text-lg md:text-xl'}`}>•</span>
                           <span className={completed ? '' : 'font-semibold'}>{item.name}</span>
                         </span>
-                        <span className={`${completed ? 'text-sm' : 'text-lg font-bold'} ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
+                        <span className={`${completed ? 'text-sm' : 'text-base md:text-lg font-bold'} ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
                           ₹{item.price}
                         </span>
                       </li>
@@ -312,11 +312,11 @@ const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible 
                   </ul>
 
                   {/* Total Price */}
-                  <div className={`flex justify-between items-center pt-3 mt-3 border-t ${completed ? 'border-muted' : 'border-primary/20'}`}>
-                    <span className={`${completed ? 'text-sm font-medium' : 'text-xl font-bold'} ${completed ? 'text-muted-foreground' : 'text-foreground'}`}>
+                  <div className={`flex justify-between items-center pt-2 md:pt-3 mt-2 md:mt-3 border-t ${completed ? 'border-muted' : 'border-primary/20'}`}>
+                    <span className={`${completed ? 'text-sm font-medium' : 'text-lg md:text-xl font-bold'} ${completed ? 'text-muted-foreground' : 'text-foreground'}`}>
                       Total:
                     </span>
-                    <span className={`${completed ? 'text-base font-semibold' : 'text-2xl font-bold'} ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
+                    <span className={`${completed ? 'text-base font-semibold' : 'text-xl md:text-2xl font-bold'} ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
                       ₹{order.items?.items?.reduce((sum: number, item: any) => sum + (parseFloat(item.price) || 0), 0).toFixed(2)}
                     </span>
                   </div>
@@ -331,7 +331,7 @@ const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible 
                         size="default"
                         variant={order.status === status ? "default" : "outline"}
                         onClick={() => updateOrderStatus(order.id, status)}
-                        className="font-semibold"
+                        className="font-semibold flex-1 sm:flex-none text-sm"
                       >
                         {status.charAt(0).toUpperCase() + status.slice(1)}
                       </Button>

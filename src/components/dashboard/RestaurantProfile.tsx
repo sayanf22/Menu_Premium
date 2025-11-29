@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, Upload, X } from "lucide-react";
+import { uploadToR2WithProgress } from "@/lib/r2Upload";
 
 interface RestaurantProfileProps {
   restaurantId: string;
@@ -88,6 +89,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -159,23 +161,18 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       
       console.log(`📦 Logo compressed: ${(file.size / 1024).toFixed(1)}KB → ${(compressedFile.size / 1024).toFixed(1)}KB`);
 
-      // Upload compressed file to Supabase Storage
-      const fileExt = 'jpg'; // Always use jpg after compression
-      const fileName = `${restaurantId}-logo-${Date.now()}.${fileExt}`;
-      const filePath = `restaurant-logos/${fileName}`;
+      // Upload to Cloudflare R2
+      const result = await uploadToR2WithProgress(
+        compressedFile,
+        "restaurant-logos",
+        (progress) => setUploadProgress(progress)
+      );
 
-      const { error: uploadError } = await supabase.storage
-        .from('menu-images')
-        .upload(filePath, compressedFile, { upsert: true });
+      if (!result.success || !result.publicUrl) {
+        throw new Error(result.error || "Upload failed");
+      }
 
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('menu-images')
-        .getPublicUrl(filePath);
-
-      setLogoUrl(publicUrl);
+      setLogoUrl(result.publicUrl);
 
       toast({
         title: "Success",
@@ -286,10 +283,18 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
                 Upload a square logo (max 200KB). Recommended: 512x512px PNG or JPG.
               </p>
               {uploading && (
-                <p className="text-xs text-primary mt-1 flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Uploading...
-                </p>
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-primary flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Uploading... {uploadProgress}%
+                  </p>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div 
+                      className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
               )}
             </div>
           </div>

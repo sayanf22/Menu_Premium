@@ -277,6 +277,27 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          count: number | null
+          id: string
+          key: string
+          window_start: string | null
+        }
+        Insert: {
+          count?: number | null
+          id?: string
+          key: string
+          window_start?: string | null
+        }
+        Update: {
+          count?: number | null
+          id?: string
+          key?: string
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       restaurants: {
         Row: {
           created_at: string
@@ -319,6 +340,39 @@ export type Database = {
           social_links?: Json | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      security_logs: {
+        Row: {
+          created_at: string | null
+          endpoint: string | null
+          event_type: string
+          id: string
+          ip_hash: string | null
+          metadata: Json | null
+          success: boolean | null
+          user_agent_hash: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint?: string | null
+          event_type: string
+          id?: string
+          ip_hash?: string | null
+          metadata?: Json | null
+          success?: boolean | null
+          user_agent_hash?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string | null
+          event_type?: string
+          id?: string
+          ip_hash?: string | null
+          metadata?: Json | null
+          success?: boolean | null
+          user_agent_hash?: string | null
         }
         Relationships: []
       }
@@ -366,6 +420,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_requests?: number
+          p_window_seconds?: number
+        }
+        Returns: boolean
+      }
+      check_request_throttle: {
+        Args: {
+          p_action: string
+          p_client_hash: string
+          p_max_per_minute?: number
+        }
+        Returns: boolean
+      }
+      cleanup_rate_limits: { Args: Record<PropertyKey, never>; Returns: undefined }
+      cleanup_security_logs: { Args: Record<PropertyKey, never>; Returns: undefined }
       create_order: {
         Args: {
           p_items: Json
@@ -375,9 +447,48 @@ export type Database = {
         }
         Returns: string
       }
+      create_order_secure: {
+        Args: {
+          p_client_hash?: string
+          p_items: Json
+          p_restaurant_id: string
+          p_table_number: string
+        }
+        Returns: Json
+      }
+      is_client_blocked: {
+        Args: {
+          p_ip_hash: string
+          p_max_failures?: number
+          p_window_minutes?: number
+        }
+        Returns: boolean
+      }
+      is_signup_code_valid: { Args: { p_code: string }; Returns: boolean }
+      log_security_event: {
+        Args: {
+          p_endpoint?: string
+          p_event_type: string
+          p_ip_hash?: string
+          p_metadata?: Json
+          p_success?: boolean
+          p_user_agent_hash?: string
+        }
+        Returns: undefined
+      }
       mark_signup_code_used: {
         Args: { p_code: string; p_user_id: string }
         Returns: boolean
+      }
+      submit_feedback_secure: {
+        Args: {
+          p_client_hash?: string
+          p_comment?: string
+          p_order_id: string
+          p_rating: number
+          p_restaurant_id: string
+        }
+        Returns: Json
       }
       toggle_restaurant_status: {
         Args: {

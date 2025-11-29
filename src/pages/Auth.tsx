@@ -8,11 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { QrCode, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { isRateLimited, getRemainingAttempts, clearRateLimit, RATE_LIMITS, getClientFingerprint } from "@/lib/security";
 
 const authSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  name: z.string().min(2, "Restaurant name must be at least 2 characters").optional(),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+  name: z.string().min(2, "Restaurant name must be at least 2 characters").max(100, "Restaurant name too long").optional(),
 });
 
 const Auth = () => {
@@ -42,6 +47,19 @@ const Auth = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Rate limiting for password reset
+    const rateLimitKey = `password_reset_${getClientFingerprint()}`;
+    if (isRateLimited(rateLimitKey, RATE_LIMITS.passwordReset)) {
+      const remaining = getRemainingAttempts(rateLimitKey, RATE_LIMITS.passwordReset);
+      toast({
+        title: "Too many attempts",
+        description: `Please wait before trying again. ${remaining} attempts remaining.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -69,6 +87,19 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Rate limiting for auth attempts
+    const rateLimitKey = `auth_${getClientFingerprint()}`;
+    if (isRateLimited(rateLimitKey, RATE_LIMITS.auth)) {
+      const remaining = getRemainingAttempts(rateLimitKey, RATE_LIMITS.auth);
+      toast({
+        title: "Too many attempts",
+        description: `Please wait before trying again. ${remaining} attempts remaining.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -123,6 +154,8 @@ const Auth = () => {
         if (error) throw error;
 
         if (data.user) {
+          // Clear rate limit on successful login
+          clearRateLimit(rateLimitKey);
           toast({
             title: "Welcome back!",
             description: "Signed in successfully",
