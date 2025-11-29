@@ -1,11 +1,14 @@
 /**
  * Security utilities for rate limiting, input sanitization, and DDoS protection
+ * Defense-in-depth approach with multiple layers of protection
  */
 
 // Rate limiter using sliding window algorithm
 interface RateLimitEntry {
   count: number;
   resetTime: number;
+  blocked: boolean;
+  blockUntil?: number;
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
@@ -13,15 +16,17 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 export interface RateLimitConfig {
   maxRequests: number;
   windowMs: number;
+  blockDurationMs?: number; // How long to block after exceeding limit
 }
 
-// Default rate limits for different actions
+// Default rate limits for different actions (stricter limits)
 export const RATE_LIMITS = {
-  auth: { maxRequests: 5, windowMs: 60 * 1000 }, // 5 attempts per minute
-  passwordReset: { maxRequests: 3, windowMs: 60 * 1000 }, // 3 per minute
-  order: { maxRequests: 10, windowMs: 60 * 1000 }, // 10 orders per minute
-  feedback: { maxRequests: 5, windowMs: 60 * 1000 }, // 5 feedback per minute
-  api: { maxRequests: 100, windowMs: 60 * 1000 }, // 100 API calls per minute
+  auth: { maxRequests: 5, windowMs: 60 * 1000, blockDurationMs: 5 * 60 * 1000 }, // 5 attempts/min, 5min block
+  passwordReset: { maxRequests: 3, windowMs: 5 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 }, // 3 per 5min, 15min block
+  order: { maxRequests: 5, windowMs: 60 * 1000, blockDurationMs: 2 * 60 * 1000 }, // 5 orders/min, 2min block
+  feedback: { maxRequests: 3, windowMs: 60 * 1000, blockDurationMs: 5 * 60 * 1000 }, // 3 feedback/min, 5min block
+  api: { maxRequests: 60, windowMs: 60 * 1000, blockDurationMs: 60 * 1000 }, // 60 API calls/min, 1min block
+  menuView: { maxRequests: 30, windowMs: 60 * 1000 }, // 30 views/min (no block)
 } as const;
 
 /**
@@ -32,18 +37,41 @@ export function isRateLimited(key: string, config: RateLimitConfig): boolean {
   const now = Date.now();
   const entry = rateLimitStore.get(key);
 
+  // Check if currently blocked
+  if (entry?.blocked && entry.blockUntil && now < entry.blockUntil) {
+    return true;
+  }
+
   if (!entry || now > entry.resetTime) {
-    // First request or window expired
-    rateLimitStore.set(key, { count: 1, resetTime: now + config.windowMs });
+    // First request or window expired - reset
+    rateLimitStore.set(key, { count: 1, resetTime: now + config.windowMs, blocked: false });
     return false;
   }
 
   if (entry.count >= config.maxRequests) {
+    // Block the user if blockDurationMs is set
+    if (config.blockDurationMs) {
+      entry.blocked = true;
+      entry.blockUntil = now + config.blockDurationMs;
+    }
     return true;
   }
 
   entry.count++;
   return false;
+}
+
+/**
+ * Check if user is currently blocked (for UI feedback)
+ */
+export function isBlocked(key: string): { blocked: boolean; remainingMs: number } {
+  const entry = rateLimitStore.get(key);
+  const now = Date.now();
+  
+  if (entry?.blocked && entry.blockUntil && now < entry.blockUntil) {
+    return { blocked: true, remainingMs: entry.blockUntil - now };
+  }
+  return { blocked: false, remainingMs: 0 };
 }
 
 /**
@@ -190,4 +218,99 @@ export function getOrCreateCSRFToken(): string {
     secureStorage.set('csrf_token', token, 24 * 60 * 60 * 1000); // 24 hours
   }
   return token;
+}
+
+/**
+ * Detect suspicious activity patterns
+ */
+export function detectSuspiciousActivity(key: string): boolean {
+  const entry = rateLimitStore.get(key);
+  if (!entry) return false;
+  
+  // If user hit rate limit multiple times, flag as suspicious
+  return entry.blocked === true;
+}
+
+/**
+ * Validate and sanitize order data
+ */
+export function validateOrderData(data: {
+  tableNumber: string;
+  items: any[];
+  restaurantId: string;
+}): { valid: boolean; error?: string } {
+  // Validate restaurant ID
+  if (!isValidUUID(data.restaurantId)) {
+    return { valid: false, error: 'Invalid restaurant' };
+  }
+  
+  // Validate table number
+  if (!isValidTableNumber(data.tableNumber)) {
+    return { valid: false, error: 'Invalid table number' };
+  }
+  
+  // Validate items array
+  if (!Array.isArray(data.items) || data.items.length === 0) {
+    return { valid: false, error: 'No items in order' };
+  }
+  
+  if (data.items.length > 50) {
+    return { valid: false, error: 'Too many items in order' };
+  }
+  
+  // Validate each item
+  for (const item of data.items) {
+    if (!item.id || !isValidUUID(item.id)) {
+      return { valid: false, error: 'Invalid item in order' };
+    }
+    if (typeof item.quantity !== 'number' || item.quantity < 1 || item.quantity > 99) {
+      return { valid: false, error: 'Invalid item quantity' };
+    }
+  }
+  
+  return { valid: true };
+}
+
+/**
+ * Sanitize feedback comment
+ */
+export function sanitizeFeedback(comment: string): string {
+  if (!comment) return '';
+  
+  // Remove any HTML/script tags
+  let sanitized = sanitizeInput(comment);
+  
+  // Limit length
+  if (sanitized.length > 1000) {
+    sanitized = sanitized.substring(0, 1000);
+  }
+  
+  // Remove excessive whitespace
+  sanitized = sanitized.replace(/\s+/g, ' ').trim();
+  
+  return sanitized;
+}
+
+/**
+ * Check for bot-like behavior
+ */
+export function detectBot(): boolean {
+  // Check for common bot indicators
+  const indicators = [
+    !navigator.cookieEnabled,
+    navigator.webdriver === true,
+    !window.localStorage,
+    !window.sessionStorage,
+    navigator.languages?.length === 0,
+  ];
+  
+  const botScore = indicators.filter(Boolean).length;
+  return botScore >= 2; // If 2+ indicators, likely a bot
+}
+
+/**
+ * Generate a honeypot field name (for form spam protection)
+ */
+export function getHoneypotFieldName(): string {
+  return 'website_url_field_' + Math.random().toString(36).substring(7);
 }

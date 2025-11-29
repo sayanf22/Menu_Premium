@@ -22,10 +22,17 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce', // More secure auth flow
   },
   realtime: {
     params: {
-      eventsPerSecond: 10,
+      eventsPerSecond: 2, // Reduced to prevent abuse
+    },
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'quick-menu-dish',
     },
   },
 });
