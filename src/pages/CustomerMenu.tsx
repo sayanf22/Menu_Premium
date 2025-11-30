@@ -297,23 +297,40 @@ const CustomerMenu = () => {
     const orderIds = JSON.parse(orderIdsStr);
     if (orderIds.length === 0) return () => {};
 
-    const channel = supabase
-      .channel(`orders-realtime-${restaurantId}-${sessionId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=in.(${orderIds.join(',')})` }, (payload) => {
-        if (!orderIds.includes(payload.new.id)) return;
-        setActiveOrders(prev => {
-          const updated = prev.map(order => order.id === payload.new.id ? { ...payload.new } : order);
-          if (updated.every(o => o.status === 'completed')) setTimeout(() => setShowFeedback(true), 500);
-          return updated;
-        });
-        setCurrentOrder(prev => prev?.id === payload.new.id ? { ...payload.new } : prev);
-        if (payload.new.status === "completed" && payload.old.status !== "completed") {
-          if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
-          toast({ title: "🎉 Order Ready!", description: `Order #${payload.new.order_number} is ready!`, duration: 8000 });
-        }
-      })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+    const channelName = `orders-realtime-${restaurantId}-${sessionId}`;
+    
+    const setupChannel = () => {
+      return supabase
+        .channel(channelName)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=in.(${orderIds.join(',')})` }, (payload) => {
+          if (!orderIds.includes(payload.new.id)) return;
+          setActiveOrders(prev => {
+            const updated = prev.map(order => order.id === payload.new.id ? { ...payload.new } : order);
+            if (updated.every(o => o.status === 'completed')) setTimeout(() => setShowFeedback(true), 500);
+            return updated;
+          });
+          setCurrentOrder(prev => prev?.id === payload.new.id ? { ...payload.new } : prev);
+          if (payload.new.status === "completed" && payload.old.status !== "completed") {
+            if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+            toast({ title: "🎉 Order Ready!", description: `Order #${payload.new.order_number} is ready!`, duration: 8000 });
+          }
+        })
+        .subscribe();
+    };
+
+    // Use managed subscription with auto-reconnect on tab visibility
+    const { registerReconnectCallback, unregisterReconnectCallback } = require("@/lib/realtimeOptimization");
+    let channel = setupChannel();
+    
+    registerReconnectCallback(channelName, () => {
+      try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
+      channel = setupChannel();
+    });
+
+    return () => {
+      unregisterReconnectCallback(channelName);
+      supabase.removeChannel(channel);
+    };
   };
 
   // Cart functions

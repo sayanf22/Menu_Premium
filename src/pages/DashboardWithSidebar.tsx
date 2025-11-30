@@ -277,35 +277,47 @@ const DashboardWithSidebar = () => {
   const subscribeToMenuViews = () => {
     if (!restaurantId) return;
 
-    const channelName = `menu-views-${restaurantId}-${Date.now()}`;
+    const channelName = `menu-views-${restaurantId}`;
     
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "menu_views",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        (payload) => {
-          const newViewCount = payload.new.view_count;
-          
-          if (newViewCount > lastViewCount) {
-            setLastViewCount(newViewCount);
+    const setupChannel = () => {
+      return supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "menu_views",
+            filter: `restaurant_id=eq.${restaurantId}`,
+          },
+          (payload) => {
+            const newViewCount = payload.new.view_count;
             
-            toast({
-              title: "👁️ New Customer!",
-              description: `Someone just scanned your QR code!`,
-              duration: 5000,
-            });
+            if (newViewCount > lastViewCount) {
+              setLastViewCount(newViewCount);
+              
+              toast({
+                title: "👁️ New Customer!",
+                description: `Someone just scanned your QR code!`,
+                duration: 5000,
+              });
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    };
+
+    // Use managed subscription with auto-reconnect
+    const { registerReconnectCallback, unregisterReconnectCallback } = require("@/lib/realtimeOptimization");
+    let channel = setupChannel();
+    
+    registerReconnectCallback(channelName, () => {
+      try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
+      channel = setupChannel();
+    });
 
     return () => {
+      unregisterReconnectCallback(channelName);
       supabase.removeChannel(channel);
     };
   };
@@ -315,29 +327,41 @@ const DashboardWithSidebar = () => {
   const subscribeToNewOrders = () => {
     if (!restaurantId) return;
 
-    const channelName = `dashboard-orders-${restaurantId}-${Date.now()}`;
+    const channelName = `dashboard-orders-${restaurantId}`;
     
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "orders",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        (payload) => {
-          const newOrder = payload.new as Order;
-          console.log('🔔 Dashboard: New order received', newOrder);
-          handleNewOrder(newOrder);
-        }
-      )
-      .subscribe((status) => {
-        console.log('🔔 Dashboard realtime status:', status);
-      });
+    const setupChannel = () => {
+      return supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "orders",
+            filter: `restaurant_id=eq.${restaurantId}`,
+          },
+          (payload) => {
+            const newOrder = payload.new as Order;
+            console.log('🔔 Dashboard: New order received', newOrder);
+            handleNewOrder(newOrder);
+          }
+        )
+        .subscribe((status) => {
+          console.log('🔔 Dashboard realtime status:', status);
+        });
+    };
+
+    // Use managed subscription with auto-reconnect
+    const { registerReconnectCallback, unregisterReconnectCallback } = require("@/lib/realtimeOptimization");
+    let channel = setupChannel();
+    
+    registerReconnectCallback(channelName, () => {
+      try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
+      channel = setupChannel();
+    });
 
     return () => {
+      unregisterReconnectCallback(channelName);
       supabase.removeChannel(channel);
     };
   };

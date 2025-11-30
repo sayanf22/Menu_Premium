@@ -1,36 +1,130 @@
 /**
  * Realtime Connection Optimization
- * Reduces realtime costs by managing connections efficiently
+ * Automatically disconnects when tab is hidden, reconnects when visible
+ * Saves Supabase free tier concurrent connection limits
  */
 
 import { supabase } from "@/integrations/supabase/client";
+import { RealtimeChannel } from "@supabase/supabase-js";
+
+// Store for managing reconnection callbacks
+type ReconnectCallback = () => void;
+const reconnectCallbacks = new Map<string, ReconnectCallback>();
+let isTabVisible = !document.hidden;
+let visibilityListenerSetup = false;
 
 /**
- * Close all realtime connections when tab is hidden
- * Saves ~20% on realtime costs
+ * Setup global visibility change listener (call once in App.tsx)
  */
 export function setupVisibilityOptimization() {
-  let channels: any[] = [];
-  
+  if (visibilityListenerSetup) return () => {};
+  visibilityListenerSetup = true;
+
   const handleVisibilityChange = () => {
-    if (document.hidden) {
-      // Tab is hidden - close all connections
-      console.log('👁️ Tab hidden - closing realtime connections');
-      channels = supabase.getChannels();
+    const wasVisible = isTabVisible;
+    isTabVisible = !document.hidden;
+
+    if (!isTabVisible && wasVisible) {
+      // Tab became hidden - disconnect all realtime
+      console.log("👁️ Tab hidden - pausing realtime connections");
       supabase.removeAllChannels();
-    } else {
-      // Tab is visible - reconnect if needed
-      console.log('👁️ Tab visible - connections will reconnect on demand');
-      // Note: Connections will be recreated by components when needed
+    } else if (isTabVisible && !wasVisible) {
+      // Tab became visible - trigger reconnections
+      console.log("👁️ Tab visible - resuming realtime connections");
+      reconnectCallbacks.forEach((callback, key) => {
+        console.log(`🔄 Reconnecting: ${key}`);
+        try {
+          callback();
+        } catch (e) {
+          console.error(`Failed to reconnect ${key}:`, e);
+        }
+      });
     }
   };
-  
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-  
-  // Cleanup function
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  // Also handle page focus/blur for mobile browsers
+  window.addEventListener("focus", () => {
+    if (!isTabVisible) {
+      isTabVisible = true;
+      reconnectCallbacks.forEach((callback) => callback());
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    // Only disconnect after a delay to avoid disconnecting during quick tab switches
+    setTimeout(() => {
+      if (document.hidden) {
+        supabase.removeAllChannels();
+      }
+    }, 5000); // 5 second grace period
+  });
+
   return () => {
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+    visibilityListenerSetup = false;
   };
+}
+
+/**
+ * Register a reconnection callback for a specific subscription
+ * Call this when setting up a realtime subscription
+ */
+export function registerReconnectCallback(key: string, callback: ReconnectCallback) {
+  reconnectCallbacks.set(key, callback);
+}
+
+/**
+ * Unregister a reconnection callback
+ * Call this when cleaning up a subscription
+ */
+export function unregisterReconnectCallback(key: string) {
+  reconnectCallbacks.delete(key);
+}
+
+/**
+ * Check if tab is currently visible
+ */
+export function isPageVisible(): boolean {
+  return isTabVisible;
+}
+
+/**
+ * Create a managed realtime subscription that auto-reconnects
+ */
+export function createManagedSubscription(
+  channelName: string,
+  setupFn: () => RealtimeChannel,
+  onReconnect?: () => void
+): { channel: RealtimeChannel; cleanup: () => void } {
+  let channel = setupFn();
+
+  const reconnect = () => {
+    // Remove old channel if exists
+    try {
+      supabase.removeChannel(channel);
+    } catch (e) {
+      // Ignore
+    }
+    // Create new channel
+    channel = setupFn();
+    if (onReconnect) onReconnect();
+  };
+
+  // Register for auto-reconnect
+  registerReconnectCallback(channelName, reconnect);
+
+  const cleanup = () => {
+    unregisterReconnectCallback(channelName);
+    try {
+      supabase.removeChannel(channel);
+    } catch (e) {
+      // Ignore
+    }
+  };
+
+  return { channel, cleanup };
 }
 
 /**
@@ -38,10 +132,10 @@ export function setupVisibilityOptimization() {
  */
 export function createDebouncedCallback<T>(
   callback: (data: T) => void,
-  delay: number = 1000
+  delay: number = 500
 ): (data: T) => void {
-  let timeoutId: NodeJS.Timeout;
-  
+  let timeoutId: ReturnType<typeof setTimeout>;
+
   return (data: T) => {
     clearTimeout(timeoutId);
     timeoutId = setTimeout(() => callback(data), delay);
@@ -49,103 +143,17 @@ export function createDebouncedCallback<T>(
 }
 
 /**
- * Monitor realtime connection count
- * Helps identify connection leaks
+ * Get current connection count
  */
-export function monitorRealtimeConnections() {
-  const interval = setInterval(() => {
-    const channels = supabase.getChannels();
-    if (channels.length > 5) {
-      console.warn(`⚠️ High realtime connection count: ${channels.length}`);
-      console.log('Active channels:', channels.map(c => c.topic));
-    }
-  }, 60000); // Check every minute
-  
-  return () => clearInterval(interval);
+export function getConnectionCount(): number {
+  return supabase.getChannels().length;
 }
 
 /**
- * Create a connection pool for realtime subscriptions
- * Reuses connections instead of creating new ones
+ * Log connection status (for debugging)
  */
-class RealtimeConnectionPool {
-  private connections: Map<string, any> = new Map();
-  
-  getOrCreate(key: string, createFn: () => any): any {
-    if (this.connections.has(key)) {
-      console.log(`♻️ Reusing realtime connection: ${key}`);
-      return this.connections.get(key);
-    }
-    
-    console.log(`🆕 Creating new realtime connection: ${key}`);
-    const connection = createFn();
-    this.connections.set(key, connection);
-    return connection;
-  }
-  
-  remove(key: string) {
-    const connection = this.connections.get(key);
-    if (connection) {
-      supabase.removeChannel(connection);
-      this.connections.delete(key);
-      console.log(`🗑️ Removed realtime connection: ${key}`);
-    }
-  }
-  
-  removeAll() {
-    this.connections.forEach((_, key) => this.remove(key));
-  }
-  
-  getCount(): number {
-    return this.connections.size;
-  }
-}
-
-export const realtimePool = new RealtimeConnectionPool();
-
-/**
- * Calculate realtime cost estimate
- */
-export function estimateRealtimeCost(
-  connectionsPerHour: number,
-  hoursPerDay: number = 8
-): {
-  dailyConnections: number;
-  monthlyConnections: number;
-  estimatedCost: number;
-} {
-  const dailyConnections = connectionsPerHour * hoursPerDay;
-  const monthlyConnections = dailyConnections * 30;
-  
-  // Supabase realtime: $10 per 1M messages (approximate)
-  // Each connection ~= 100 messages/hour
-  const messagesPerConnection = 100;
-  const totalMessages = monthlyConnections * messagesPerConnection;
-  const estimatedCost = (totalMessages / 1000000) * 10;
-  
-  return {
-    dailyConnections,
-    monthlyConnections,
-    estimatedCost: parseFloat(estimatedCost.toFixed(2)),
-  };
-}
-
-/**
- * Optimize subscription filters
- * More specific filters = less bandwidth
- */
-export function createOptimizedFilter(
-  table: string,
-  conditions: Record<string, any>
-): string {
-  const filters = Object.entries(conditions)
-    .map(([key, value]) => {
-      if (Array.isArray(value)) {
-        return `${key}=in.(${value.join(',')})`;
-      }
-      return `${key}=eq.${value}`;
-    })
-    .join(',');
-  
-  return filters;
+export function logConnectionStatus() {
+  const channels = supabase.getChannels();
+  console.log(`📡 Active connections: ${channels.length}`);
+  channels.forEach((c) => console.log(`  - ${c.topic}`));
 }
