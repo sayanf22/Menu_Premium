@@ -277,91 +277,68 @@ const DashboardWithSidebar = () => {
   const subscribeToMenuViews = () => {
     if (!restaurantId) return;
 
-    const channelName = `menu-views-${restaurantId}`;
+    // Dashboard stays connected even in background - no visibility optimization
+    const channelName = `menu-views-${restaurantId}-${Date.now()}`;
     
-    const setupChannel = () => {
-      return supabase
-        .channel(channelName)
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "menu_views",
-            filter: `restaurant_id=eq.${restaurantId}`,
-          },
-          (payload) => {
-            const newViewCount = payload.new.view_count;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "menu_views",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        (payload) => {
+          const newViewCount = payload.new.view_count;
+          
+          if (newViewCount > lastViewCount) {
+            setLastViewCount(newViewCount);
             
-            if (newViewCount > lastViewCount) {
-              setLastViewCount(newViewCount);
-              
-              toast({
-                title: "👁️ New Customer!",
-                description: `Someone just scanned your QR code!`,
-                duration: 5000,
-              });
-            }
+            toast({
+              title: "👁️ New Customer!",
+              description: `Someone just scanned your QR code!`,
+              duration: 5000,
+            });
           }
-        )
-        .subscribe();
-    };
-
-    // Use managed subscription with auto-reconnect
-    const { registerReconnectCallback, unregisterReconnectCallback } = require("@/lib/realtimeOptimization");
-    let channel = setupChannel();
-    
-    registerReconnectCallback(channelName, () => {
-      try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
-      channel = setupChannel();
-    });
+        }
+      )
+      .subscribe();
 
     return () => {
-      unregisterReconnectCallback(channelName);
       supabase.removeChannel(channel);
     };
   };
 
-  // Keep realtime subscription active at dashboard level
-  // This ensures we receive orders even when not on Orders tab
+  // Keep realtime subscription ALWAYS active at dashboard level
+  // Dashboard must receive orders even when tab is in background
   const subscribeToNewOrders = () => {
     if (!restaurantId) return;
 
-    const channelName = `dashboard-orders-${restaurantId}`;
+    const channelName = `dashboard-orders-${restaurantId}-${Date.now()}`;
     
-    const setupChannel = () => {
-      return supabase
-        .channel(channelName)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "orders",
-            filter: `restaurant_id=eq.${restaurantId}`,
-          },
-          (payload) => {
-            const newOrder = payload.new as Order;
-            console.log('🔔 Dashboard: New order received', newOrder);
-            handleNewOrder(newOrder);
-          }
-        )
-        .subscribe((status) => {
-          console.log('🔔 Dashboard realtime status:', status);
-        });
-    };
-
-    // Use managed subscription with auto-reconnect
-    const { registerReconnectCallback, unregisterReconnectCallback } = require("@/lib/realtimeOptimization");
-    let channel = setupChannel();
-    
-    registerReconnectCallback(channelName, () => {
-      try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
-      channel = setupChannel();
-    });
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "orders",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        (payload) => {
+          const newOrder = payload.new as Order;
+          console.log('🔔 Dashboard: New order received', newOrder);
+          handleNewOrder(newOrder);
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 Dashboard realtime status:', status);
+      });
 
     return () => {
-      unregisterReconnectCallback(channelName);
       supabase.removeChannel(channel);
     };
   };

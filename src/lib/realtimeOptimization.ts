@@ -15,6 +15,7 @@ let visibilityListenerSetup = false;
 
 /**
  * Setup global visibility change listener (call once in App.tsx)
+ * Only affects customer menu pages, NOT the dashboard
  */
 export function setupVisibilityOptimization() {
   if (visibilityListenerSetup) return () => {};
@@ -24,13 +25,29 @@ export function setupVisibilityOptimization() {
     const wasVisible = isTabVisible;
     isTabVisible = !document.hidden;
 
+    // Skip optimization for dashboard pages - they need to stay connected
+    const isDashboard = window.location.pathname.includes("/dashboard") || 
+                        window.location.pathname.includes("/admindashboard");
+    
+    if (isDashboard) {
+      console.log("👁️ Dashboard detected - keeping connections alive");
+      return;
+    }
+
     if (!isTabVisible && wasVisible) {
-      // Tab became hidden - disconnect all realtime
-      console.log("👁️ Tab hidden - pausing realtime connections");
-      supabase.removeAllChannels();
+      // Tab became hidden - disconnect customer menu realtime only
+      console.log("👁️ Tab hidden - pausing customer menu connections");
+      // Only remove channels registered for reconnection (customer menu)
+      reconnectCallbacks.forEach((_, key) => {
+        const channels = supabase.getChannels();
+        const channel = channels.find(c => c.topic.includes(key));
+        if (channel) {
+          supabase.removeChannel(channel);
+        }
+      });
     } else if (isTabVisible && !wasVisible) {
-      // Tab became visible - trigger reconnections
-      console.log("👁️ Tab visible - resuming realtime connections");
+      // Tab became visible - trigger reconnections for customer menu
+      console.log("👁️ Tab visible - resuming customer menu connections");
       reconnectCallbacks.forEach((callback, key) => {
         console.log(`🔄 Reconnecting: ${key}`);
         try {
@@ -43,23 +60,6 @@ export function setupVisibilityOptimization() {
   };
 
   document.addEventListener("visibilitychange", handleVisibilityChange);
-
-  // Also handle page focus/blur for mobile browsers
-  window.addEventListener("focus", () => {
-    if (!isTabVisible) {
-      isTabVisible = true;
-      reconnectCallbacks.forEach((callback) => callback());
-    }
-  });
-
-  window.addEventListener("blur", () => {
-    // Only disconnect after a delay to avoid disconnecting during quick tab switches
-    setTimeout(() => {
-      if (document.hidden) {
-        supabase.removeAllChannels();
-      }
-    }, 5000); // 5 second grace period
-  });
 
   return () => {
     document.removeEventListener("visibilitychange", handleVisibilityChange);
