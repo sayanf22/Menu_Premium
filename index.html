@@ -10,13 +10,12 @@
     <script>
       console.log('🔔 OneSignal script loading...');
       
-      // Only initialize OneSignal on localhost or production domain
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isProduction = window.location.hostname.includes('vercel.app') || 
-                          window.location.hostname.includes('netlify.app') ||
-                          window.location.hostname.includes('your-domain.com'); // Add your production domain
+      // Initialize OneSignal on any HTTPS domain or localhost
+      const isSecure = window.location.protocol === 'https:' || 
+                       window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1';
       
-      if (isLocalhost || isProduction) {
+      if (isSecure) {
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         OneSignalDeferred.push(async function(OneSignal) {
           console.log('🔔 OneSignal initializing...');
@@ -25,22 +24,43 @@
               appId: "30e2fbc2-8319-4e46-9cb3-2e9c24b2201c",
               safari_web_id: "web.onesignal.auto.185a3882-a3fa-4e4c-9216-d752294e35fc",
               allowLocalhostAsSecureOrigin: true,
+              serviceWorkerPath: "/OneSignalSDKWorker.js",
+              // Prompt settings
+              promptOptions: {
+                slidedown: {
+                  prompts: [{
+                    type: "push",
+                    autoPrompt: false, // We'll prompt manually in dashboard
+                    text: {
+                      actionMessage: "Get notified when new orders come in!",
+                      acceptButton: "Allow",
+                      cancelButton: "Later"
+                    }
+                  }]
+                }
+              },
+              // Notification settings
               notifyButton: {
-                enable: true,
-                size: 'medium',
-                position: 'bottom-right',
-                showCredit: false,
+                enable: false, // We handle this in dashboard
+              },
+              // Welcome notification
+              welcomeNotification: {
+                title: "AddMenu Notifications",
+                message: "You'll now receive order alerts!"
               }
             });
             
             console.log('✅ OneSignal initialized successfully!');
-            console.log('OneSignal object:', OneSignal);
+            
+            // Log current state
+            const permission = await OneSignal.Notifications.permission;
+            console.log('🔔 Current permission:', permission);
           } catch (error) {
             console.error('❌ OneSignal initialization error:', error);
           }
         });
       } else {
-        console.log('⚠️ OneSignal skipped - not on allowed domain');
+        console.log('⚠️ OneSignal requires HTTPS');
       }
     </script>
     <meta name="description" content="Modern QR ordering system for restaurants. Contactless menu browsing, real-time order tracking, and customer feedback." />

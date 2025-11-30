@@ -118,23 +118,51 @@ const DashboardWithSidebar = () => {
     checkAuth();
   }, []);
 
-  // Tag user with restaurant_id for OneSignal
+  // Setup OneSignal for push notifications
   useEffect(() => {
     if (!restaurantId) return;
 
-    const tagUser = () => {
-      if (typeof window !== 'undefined' && (window as any).OneSignalDeferred) {
-        (window as any).OneSignalDeferred.push(async function(OneSignal: any) {
-          try {
-            await OneSignal.User.addTag("restaurant_id", restaurantId);
-          } catch (error) {
-            console.error('Error tagging user:', error);
-          }
-        });
+    const setupOneSignal = async () => {
+      if (typeof window === "undefined" || !(window as any).OneSignalDeferred) {
+        console.log("⚠️ OneSignal not available");
+        return;
       }
+
+      (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
+        try {
+          // Tag user with restaurant_id so notifications go to the right device
+          await OneSignal.User.addTag("restaurant_id", restaurantId);
+          console.log("✅ OneSignal tagged with restaurant_id:", restaurantId);
+
+          // Check if already subscribed
+          const permission = await OneSignal.Notifications.permission;
+          console.log("🔔 OneSignal permission:", permission);
+
+          // Request permission if not granted
+          if (!permission) {
+            const granted = await OneSignal.Notifications.requestPermission();
+            console.log("🔔 Permission request result:", granted);
+            
+            if (granted) {
+              toast({
+                title: "🔔 Notifications Enabled!",
+                description: "You'll receive alerts when new orders come in",
+                duration: 5000,
+              });
+            }
+          }
+
+          // Log subscription status
+          const subscribed = await OneSignal.User.PushSubscription.optedIn;
+          console.log("🔔 OneSignal subscribed:", subscribed);
+        } catch (error) {
+          console.error("❌ OneSignal setup error:", error);
+        }
+      });
     };
 
-    const timer = setTimeout(tagUser, 3000);
+    // Delay to ensure OneSignal is fully loaded
+    const timer = setTimeout(setupOneSignal, 2000);
     return () => clearTimeout(timer);
   }, [restaurantId]);
 
