@@ -8,6 +8,7 @@ import { setupVisibilityOptimization } from "@/lib/realtimeOptimization";
 import Auth from "./pages/Auth";
 import DashboardWithSidebar from "./pages/DashboardWithSidebar";
 import CustomerMenu from "./pages/CustomerMenu";
+import MenuSession from "./pages/MenuSession";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboardWithSidebar from "./pages/AdminDashboardWithSidebar";
 import ResetPassword from "./pages/ResetPassword";
@@ -44,6 +45,7 @@ const App = () => {
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<DashboardWithSidebar />} />
+            <Route path="/scan/:restaurantId" element={<MenuSession />} />
             <Route path="/menu/:restaurantId" element={<CustomerMenu />} />
             <Route path="/admindashboard/login" element={<AdminLogin />} />
             <Route path="/admindashboard" element={<AdminDashboardWithSidebar />} />

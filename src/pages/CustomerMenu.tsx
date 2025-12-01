@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  ShoppingCart, Star, Plus, Minus, X, Search, Moon, Sun, ChefHat, Clock, 
+  ShoppingCart, Plus, Minus, X, Search, Moon, Sun, Clock, 
   CheckCircle2, ArrowRight, Utensils, Sparkles, Salad, UtensilsCrossed, 
   Coffee, IceCream, Wine, Soup, Pizza, Sandwich, Flame, Leaf, Fish, Beef, Cookie,
   Instagram, Facebook, Twitter, Globe
@@ -162,7 +162,63 @@ const CustomerMenu = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // Session management
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [remainingMinutes, setRemainingMinutes] = useState<number | null>(null);
+  const sessionActivityRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Get session ID from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const menuSessionId = urlParams.get('session');
+  
   const sessionId = useRef(localStorage.getItem("session_id") || `session_${restaurantId}_${Date.now()}`).current;
+  
+  // Validate session on load and periodically
+  useEffect(() => {
+    if (!menuSessionId) {
+      // No session - allow access for backward compatibility but show warning
+      console.log("⚠️ No session ID - direct access");
+      return;
+    }
+
+    const validateSession = async () => {
+      try {
+        const { data, error } = await supabase.rpc("validate_menu_session", {
+          p_session_id: menuSessionId,
+        });
+
+        if (error) {
+          console.error("Session validation error:", error);
+          return;
+        }
+
+        const result = data?.[0];
+        if (!result) return;
+
+        if (!result.is_valid) {
+          setSessionExpired(true);
+          setSessionError(result.error_message || "Session expired");
+        } else {
+          setRemainingMinutes(result.remaining_minutes);
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      }
+    };
+
+    // Validate immediately
+    validateSession();
+
+    // Validate every 2 minutes to update activity and check expiry
+    sessionActivityRef.current = setInterval(validateSession, 2 * 60 * 1000);
+
+    return () => {
+      if (sessionActivityRef.current) {
+        clearInterval(sessionActivityRef.current);
+      }
+    };
+  }, [menuSessionId]);
 
   const formatINR = useCallback((value: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0)), []);
@@ -511,6 +567,30 @@ const CustomerMenu = () => {
             </div>
             <h1 className="text-2xl font-bold mb-2">Service Unavailable</h1>
             <p className="text-zinc-500 dark:text-zinc-400">{restaurantContact.name}'s menu is currently unavailable.</p>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Session Expired - Block access and show message
+  if (sessionExpired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-100 dark:bg-black p-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={springConfig}>
+          <Card className="max-w-md w-full p-8 text-center border-0 shadow-2xl rounded-3xl bg-white dark:bg-zinc-900">
+            <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="h-10 w-10 text-amber-500" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Session Expired</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-6">
+              {sessionError || "Your menu session has ended. Please scan the QR code at the restaurant again."}
+            </p>
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                📱 Scan the QR code on your table to start a new session
+              </p>
+            </div>
           </Card>
         </motion.div>
       </div>

@@ -204,6 +204,47 @@ export type Database = {
           },
         ]
       }
+      menu_sessions: {
+        Row: {
+          created_at: string
+          device_fingerprint: string | null
+          expires_at: string
+          id: string
+          is_active: boolean
+          last_activity_at: string
+          restaurant_id: string
+          table_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_fingerprint?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          last_activity_at?: string
+          restaurant_id: string
+          table_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_fingerprint?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          last_activity_at?: string
+          restaurant_id?: string
+          table_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_sessions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_views: {
         Row: {
           created_at: string
@@ -436,8 +477,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_expired_sessions: { Args: Record<PropertyKey, never>; Returns: number }
       cleanup_rate_limits: { Args: Record<PropertyKey, never>; Returns: undefined }
       cleanup_security_logs: { Args: Record<PropertyKey, never>; Returns: undefined }
+      create_menu_session: {
+        Args: {
+          p_device_fingerprint?: string
+          p_restaurant_id: string
+          p_table_number?: string
+        }
+        Returns: string
+      }
       create_order: {
         Args: {
           p_items: Json
@@ -456,6 +506,7 @@ export type Database = {
         }
         Returns: Json
       }
+      end_menu_session: { Args: { p_session_id: string }; Returns: boolean }
       is_client_blocked: {
         Args: {
           p_ip_hash: string
@@ -497,6 +548,16 @@ export type Database = {
           p_restaurant_id: string
         }
         Returns: boolean
+      }
+      validate_menu_session: {
+        Args: { p_session_id: string }
+        Returns: {
+          error_message: string
+          expires_at: string
+          is_valid: boolean
+          remaining_minutes: number
+          restaurant_id: string
+        }[]
       }
       validate_signup_code: { Args: { p_code: string }; Returns: boolean }
       verify_admin_password: {
