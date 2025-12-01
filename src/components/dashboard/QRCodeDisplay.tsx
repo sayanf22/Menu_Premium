@@ -18,6 +18,7 @@ interface QRCodeDisplayProps {
 
 // QR Style presets
 const QR_STYLES = [
+  { id: 'standard', name: 'Standard', icon: QrIcon, dotStyle: 'standard' },
   { id: 'modern', name: 'Modern', icon: Circle, dotStyle: 'circle' },
   { id: 'classic', name: 'Classic', icon: Square, dotStyle: 'square' },
   { id: 'rounded', name: 'Rounded', icon: Diamond, dotStyle: 'rounded' },
@@ -37,7 +38,7 @@ const COLOR_PRESETS = [
   { id: 'gradient2', name: 'Ocean', fg: 'gradient:667EEA,764BA2', bg: '#FFFFFF' },
 ];
 
-type DotStyle = 'circle' | 'square' | 'rounded' | 'dots' | 'elegant';
+type DotStyle = 'standard' | 'circle' | 'square' | 'rounded' | 'dots' | 'elegant';
 
 interface QRConfig {
   style: DotStyle;
@@ -54,9 +55,9 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   const [showCustomize, setShowCustomize] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // QR Configuration state
+  // QR Configuration state - default to standard (universal) style
   const [config, setConfig] = useState<QRConfig>({
-    style: 'circle',
+    style: 'standard',
     fgColor: '#000000',
     bgColor: '#FFFFFF',
     dotScale: 0.85,
@@ -107,6 +108,24 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
       ctx.fillStyle = colors[0];
     }
     
+    // Standard style - universal QR like Google Pay/PhonePe
+    if (cfg.style === 'standard') {
+      for (let row = 0; row < moduleCount; row++) {
+        for (let col = 0; col < moduleCount; col++) {
+          if (modules.get(row, col)) {
+            // Simple filled squares - universal compatibility
+            ctx.fillRect(
+              margin + col * dotSize,
+              margin + row * dotSize,
+              dotSize,
+              dotSize
+            );
+          }
+        }
+      }
+      return;
+    }
+    
     // Draw QR modules based on style
     for (let row = 0; row < moduleCount; row++) {
       for (let col = 0; col < moduleCount; col++) {
@@ -152,11 +171,16 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     x: number, y: number, 
     radius: number, dotSize: number,
     style: DotStyle,
-    row: number, col: number
+    _row: number, _col: number
   ) => {
     ctx.beginPath();
     
     switch (style) {
+      case 'standard':
+        // Full square - handled separately in generateQR
+        ctx.rect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+        break;
+        
       case 'circle':
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         break;
@@ -218,7 +242,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
   const resetConfig = () => {
     setConfig({
-      style: 'circle',
+      style: 'standard',
       fgColor: '#000000',
       bgColor: '#FFFFFF',
       dotScale: 0.85,
@@ -339,9 +363,10 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                         Reset
                       </Button>
                     </div>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       {QR_STYLES.map((style) => {
                         const Icon = style.icon;
+                        const isStandard = style.id === 'standard';
                         return (
                           <motion.button
                             key={style.id}
@@ -352,10 +377,11 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                               config.style === style.dotStyle 
                                 ? 'bg-primary text-primary-foreground shadow-lg' 
                                 : 'bg-muted hover:bg-muted/80'
-                            }`}
+                            } ${isStandard ? 'ring-1 ring-green-500/30' : ''}`}
                           >
                             <Icon className="h-5 w-5" />
                             <span className="text-[10px] font-medium">{style.name}</span>
+                            {isStandard && <span className="text-[8px] opacity-70">Universal</span>}
                           </motion.button>
                         );
                       })}
