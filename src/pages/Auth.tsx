@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { QrCode, Eye, EyeOff, Menu, FileText, Shield, RefreshCw, Truck, Phone, IndianRupee, Info, X } from "lucide-react";
+import { QrCode, Eye, EyeOff, FileText, Shield, RefreshCw, Truck, Phone, IndianRupee, Info, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { isRateLimited, getRemainingAttempts, clearRateLimit, RATE_LIMITS, getClientFingerprint } from "@/lib/security";
@@ -183,39 +183,61 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4 relative">
-      {/* Hamburger Menu */}
+      {/* Modern Minimal Menu Button */}
       <div className="absolute top-4 right-4 z-50">
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="rounded-full">
-              <Menu className="h-5 w-5" />
-            </Button>
+            <button 
+              className="group relative w-10 h-10 flex items-center justify-center rounded-xl bg-background/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 shadow-sm"
+              aria-label="Open menu"
+            >
+              <div className="flex flex-col gap-1.5">
+                <span className={`block h-0.5 bg-foreground/70 group-hover:bg-primary transition-all duration-300 ${menuOpen ? 'w-4 rotate-45 translate-y-2' : 'w-5'}`} />
+                <span className={`block h-0.5 bg-foreground/70 group-hover:bg-primary transition-all duration-300 ${menuOpen ? 'opacity-0' : 'w-3.5 ml-auto'}`} />
+                <span className={`block h-0.5 bg-foreground/70 group-hover:bg-primary transition-all duration-300 ${menuOpen ? 'w-4 -rotate-45 -translate-y-2' : 'w-4'}`} />
+              </div>
+            </button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[280px] sm:w-[320px]">
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                <QrCode className="h-5 w-5 text-primary" />
-                AddMenu
+          <SheetContent side="right" className="w-[300px] sm:w-[340px] border-l border-border/50 bg-background/95 backdrop-blur-xl">
+            <SheetHeader className="pb-6 border-b border-border/50">
+              <SheetTitle className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <QrCode className="h-5 w-5 text-primary" />
+                </div>
+                <span className="text-lg font-semibold">AddMenu</span>
               </SheetTitle>
             </SheetHeader>
+            
             <nav className="mt-6 flex flex-col gap-1">
-              {menuItems.map((item) => (
+              {menuItems.map((item, index) => (
                 <Link
                   key={item.to}
                   to={item.to}
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  className="group flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.label}</span>
+                  <div className="p-2 rounded-lg bg-muted/50 group-hover:bg-primary/10 transition-colors">
+                    <item.icon className="h-4 w-4 group-hover:text-primary transition-colors" />
+                  </div>
+                  <span className="font-medium text-sm">{item.label}</span>
+                  <ExternalLink className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50 transition-opacity" />
                 </Link>
               ))}
             </nav>
-            <div className="absolute bottom-6 left-6 right-6">
-              <div className="text-xs text-muted-foreground text-center space-y-1">
-                <p>© 2025 AddMenu</p>
-                <p>support@addmenu.in</p>
-                <p>+91 700-583-2798</p>
+
+            {/* Footer */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border/50 bg-muted/30">
+              <div className="text-center space-y-2">
+                <p className="text-xs font-medium text-foreground/80">© 2025 AddMenu</p>
+                <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                  <a href="mailto:support@addmenu.in" className="hover:text-primary transition-colors">
+                    support@addmenu.in
+                  </a>
+                </div>
+                <a href="tel:+917005832798" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+                  +91 700-583-2798
+                </a>
               </div>
             </div>
           </SheetContent>
