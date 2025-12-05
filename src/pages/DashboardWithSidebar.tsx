@@ -16,8 +16,10 @@ import {
   Settings, 
   Bell, 
   X,
-  User
+  User,
+  FileText
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -583,6 +585,23 @@ const DashboardWithSidebar = () => {
             </div>
           </div>
           <div className="space-y-2">
+            {/* Policy Links */}
+            <Link
+              to="/terms"
+              className="flex items-center justify-start gap-2 group/sidebar py-2 cursor-pointer text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200"
+            >
+              <FileText className="h-4 w-4 flex-shrink-0" />
+              <motion.span
+                animate={{
+                  display: open ? "inline-block" : "none",
+                  opacity: open ? 1 : 0,
+                }}
+                className="text-xs group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+              >
+                Terms & Policies
+              </motion.span>
+            </Link>
+            
             <div
               onClick={() => {
                 setOpen(false); // Close mobile sidebar

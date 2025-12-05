@@ -53,7 +53,6 @@ Visit: http://localhost:8080
 ### For Platform Admins 👨‍💼
 - Manage all restaurants
 - Enable/disable restaurant services
-- Create & manage signup codes
 - Activity logging
 - Real-time dashboard with animated sidebar
 
@@ -175,7 +174,6 @@ src/
 │   └── dashboard/
 │       ├── OrderManagement.tsx      # Order list & management
 │       ├── MenuManagement.tsx       # Menu CRUD
-│       ├── SignupCodeManagement.tsx # Admin signup codes
 │       └── ...                      # Other dashboard components
 ├── pages/
 │   ├── Auth.tsx                     # Login/Signup

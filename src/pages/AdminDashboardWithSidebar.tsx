@@ -24,9 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Search, Shield, Power, PowerOff, Ticket, BarChart3 } from "lucide-react";
+import { LogOut, Search, Shield, Power, PowerOff, BarChart3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { SignupCodeManagement } from "@/components/dashboard/SignupCodeManagement";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -63,12 +62,6 @@ const AdminDashboardWithSidebar = () => {
       href: "#restaurants",
       icon: <Shield className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
       onClick: () => setActiveTab("restaurants"),
-    },
-    {
-      label: "Signup Codes",
-      href: "#signup-codes",
-      icon: <Ticket className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
-      onClick: () => setActiveTab("signup-codes"),
     },
     {
       label: "Analytics",
@@ -478,8 +471,6 @@ const AdminContent = ({
             </Card>
           </div>
         )}
-
-        {activeTab === "signup-codes" && <SignupCodeManagement />}
 
         {activeTab === "analytics" && (
           <div className="space-y-6">

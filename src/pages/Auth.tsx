@@ -27,7 +27,6 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
-  const [signupCode, setSignupCode] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -109,14 +108,6 @@ const Auth = () => {
       authSchema.parse(validationData);
 
       if (isSignUp) {
-        // Validate signup code first
-        const { data: isValidCode, error: codeError } = await supabase
-          .rpc('validate_signup_code', { p_code: signupCode });
-
-        if (codeError || !isValidCode) {
-          throw new Error("Invalid or expired signup code. Please contact support for a valid code.");
-        }
-
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -124,7 +115,6 @@ const Auth = () => {
             emailRedirectTo: `${window.location.origin}/dashboard`,
             data: {
               name: restaurantName,
-              signup_code: signupCode,
             }
           }
         });
@@ -132,15 +122,9 @@ const Auth = () => {
         if (error) throw error;
 
         if (data.user) {
-          // Mark the code as used
-          await supabase.rpc('mark_signup_code_used', { 
-            p_code: signupCode, 
-            p_user_id: data.user.id 
-          });
-
           toast({
             title: "Account created!",
-            description: "Welcome to QuickMenu. Setting up your dashboard...",
+            description: "Welcome to AddMenu. Setting up your dashboard...",
           });
           navigate("/dashboard");
         }
@@ -312,32 +296,16 @@ const Auth = () => {
           ) : (
             <form onSubmit={handleAuth} className="space-y-4">
             {isSignUp && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="name">Restaurant Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Your Restaurant"
-                    value={restaurantName}
-                    onChange={(e) => setRestaurantName(e.target.value)}
-                    required={isSignUp}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signupCode">Signup Code</Label>
-                  <Input
-                    id="signupCode"
-                    placeholder="Enter your signup code"
-                    value={signupCode}
-                    onChange={(e) => setSignupCode(e.target.value.toUpperCase())}
-                    required={isSignUp}
-                    className="font-mono"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Contact support to get your premium access code
-                  </p>
-                </div>
-              </>
+              <div className="space-y-2">
+                <Label htmlFor="name">Restaurant Name</Label>
+                <Input
+                  id="name"
+                  placeholder="Your Restaurant"
+                  value={restaurantName}
+                  onChange={(e) => setRestaurantName(e.target.value)}
+                  required={isSignUp}
+                />
+              </div>
             )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
