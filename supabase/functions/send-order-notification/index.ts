@@ -83,12 +83,13 @@ serve(async (req) => {
       // Priority settings
       priority: 10,
       ttl: 3600, // 1 hour TTL
-      // Action buttons
+      // Action buttons - URL should point to your app domain
+      // Note: Replace with your actual app URL in production
       web_buttons: [
         {
           id: "view_order",
           text: "View Order",
-          url: `${supabaseUrl.replace(".supabase.co", "")}/dashboard#orders`,
+          url: `${Deno.env.get("APP_URL") || "https://your-app-domain.com"}/dashboard#orders`,
         },
       ],
     };

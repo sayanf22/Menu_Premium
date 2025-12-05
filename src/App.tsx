@@ -13,6 +13,14 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboardWithSidebar from "./pages/AdminDashboardWithSidebar";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+// Policy pages for Razorpay verification
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import RefundPolicy from "./pages/RefundPolicy";
+import ShippingPolicy from "./pages/ShippingPolicy";
+import Contact from "./pages/Contact";
+import Pricing from "./pages/Pricing";
+import About from "./pages/About";
 
 // Configure React Query with optimized defaults
 const queryClient = new QueryClient({
@@ -49,6 +57,14 @@ const App = () => {
             <Route path="/menu/:restaurantId" element={<CustomerMenu />} />
             <Route path="/admindashboard/login" element={<AdminLogin />} />
             <Route path="/admindashboard" element={<AdminDashboardWithSidebar />} />
+            {/* Policy pages for Razorpay verification */}
+            <Route path="/terms" element={<TermsAndConditions />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/about" element={<About />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

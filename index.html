@@ -10,12 +10,11 @@
     <script>
       console.log('🔔 OneSignal script loading...');
       
-      // Initialize OneSignal on any HTTPS domain or localhost
-      const isSecure = window.location.protocol === 'https:' || 
-                       window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1';
+      // Only initialize OneSignal on production domain (addmenu.site)
+      const isProductionDomain = window.location.hostname === 'addmenu.site' || 
+                                  window.location.hostname.endsWith('.addmenu.site');
       
-      if (isSecure) {
+      if (isProductionDomain) {
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         OneSignalDeferred.push(async function(OneSignal) {
           console.log('🔔 OneSignal initializing...');
@@ -60,7 +59,7 @@
           }
         });
       } else {
-        console.log('⚠️ OneSignal requires HTTPS');
+        console.log('⚠️ OneSignal skipped - only runs on addmenu.site (current:', window.location.hostname, ')');
       }
     </script>
     <meta name="description" content="Modern QR ordering system for restaurants. Contactless menu browsing, real-time order tracking, and customer feedback." />

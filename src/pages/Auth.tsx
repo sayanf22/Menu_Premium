@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { QrCode, Eye, EyeOff } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { QrCode, Eye, EyeOff, Menu, FileText, Shield, RefreshCw, Truck, Phone, IndianRupee, Info, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { isRateLimited, getRemainingAttempts, clearRateLimit, RATE_LIMITS, getClientFingerprint } from "@/lib/security";
@@ -30,6 +31,7 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -185,8 +187,57 @@ const Auth = () => {
     }
   };
 
+  const menuItems = [
+    { to: "/terms", icon: FileText, label: "Terms & Conditions" },
+    { to: "/privacy-policy", icon: Shield, label: "Privacy Policy" },
+    { to: "/refund-policy", icon: RefreshCw, label: "Refund Policy" },
+    { to: "/shipping-policy", icon: Truck, label: "Shipping Policy" },
+    { to: "/contact", icon: Phone, label: "Contact Us" },
+    { to: "/pricing", icon: IndianRupee, label: "Pricing" },
+    { to: "/about", icon: Info, label: "About Us" },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4 relative">
+      {/* Hamburger Menu */}
+      <div className="absolute top-4 right-4 z-50">
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="rounded-full">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[280px] sm:w-[320px]">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-primary" />
+                AddMenu
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="mt-6 flex flex-col gap-1">
+              {menuItems.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+            <div className="absolute bottom-6 left-6 right-6">
+              <div className="text-xs text-muted-foreground text-center space-y-1">
+                <p>© 2025 AddMenu</p>
+                <p>support@addmenu.in</p>
+                <p>+91 700-583-2798</p>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
       <Card className="w-full max-w-md shadow-[var(--shadow-medium)] animate-scale-in">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
@@ -361,6 +412,19 @@ const Auth = () => {
               </button>
             </div>
           )}
+
+          {/* Policy Links Footer */}
+          <div className="mt-6 pt-4 border-t">
+            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
+              <span>•</span>
+              <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy</Link>
+              <span>•</span>
+              <Link to="/refund-policy" className="hover:text-primary transition-colors">Refunds</Link>
+              <span>•</span>
+              <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
