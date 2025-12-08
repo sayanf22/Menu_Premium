@@ -23,9 +23,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flowType: 'pkce', // More secure auth flow
+    flowType: 'pkce',
     storageKey: 'addmenu-auth-token',
-    // Keep user logged in for 30 days
+    // Debug: log auth state changes
+    debug: false,
   },
   realtime: {
     params: {
