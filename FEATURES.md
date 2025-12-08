@@ -1,6 +1,6 @@
 # AddMenu - Subscription Plans
 
-## Advanced Plan (₹199/month)
+## Advanced Plan (₹599/month)
 
 Digital menu display for restaurants.
 
@@ -16,7 +16,7 @@ Digital menu display for restaurants.
 
 ---
 
-## Premium Plan (₹399/month)
+## Premium Plan (₹999/month)
 
 Complete menu and ordering system.
 
