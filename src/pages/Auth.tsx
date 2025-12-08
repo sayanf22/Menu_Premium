@@ -645,6 +645,66 @@ const Auth = () => {
 
           {activeTab === "signup" ? (
             <form onSubmit={handleSignUpFormSubmit} className="space-y-4">
+              {/* Show selected plan when preselected via URL */}
+              {preselectedPlan && selectedPlanId && plans.length > 0 && (() => {
+                const plan = plans.find(p => p.id === selectedPlanId);
+                if (!plan) return null;
+                const price = isYearly ? plan.price_yearly : plan.price_monthly;
+                return (
+                  <div className="bg-gradient-to-r from-orange-50 to-orange-100/50 border border-orange-200 rounded-2xl p-4 mb-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          plan.has_orders_feature ? "bg-orange-500 text-white" : "bg-orange-200 text-orange-600"
+                        }`}>
+                          {plan.has_orders_feature ? <Star className="h-5 w-5" /> : <Check className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900">{plan.name}</h3>
+                            {plan.has_orders_feature && (
+                              <Badge className="bg-orange-500 text-white text-xs hover:bg-orange-500">Popular</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500">{plan.description}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-gray-900">{formatPrice(price)}</span>
+                        <span className="text-gray-500 text-sm">/{isYearly ? 'yr' : 'mo'}</span>
+                      </div>
+                    </div>
+                    {/* Billing toggle for preselected plan */}
+                    <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-orange-200/50">
+                      <button
+                        type="button"
+                        onClick={() => setIsYearly(false)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                          !isYearly ? "bg-orange-500 text-white" : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsYearly(true)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
+                          isYearly ? "bg-orange-500 text-white" : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        Yearly <span className="text-[10px] opacity-80">(-17%)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setPreselectedPlan(null); }}
+                        className="ml-2 text-xs text-gray-400 hover:text-orange-500 underline"
+                      >
+                        Change plan
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="space-y-2">
                 <Label className="text-gray-700 font-medium">Restaurant Name *</Label>
                 <Input 
