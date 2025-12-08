@@ -132,7 +132,12 @@ const Auth = () => {
     e.preventDefault();
     try {
       authSchema.parse({ email, password, name: restaurantName });
-      setSignUpStep("plan");
+      // If plan is preselected via URL, skip plan selection and go directly to payment
+      if (preselectedPlan && selectedPlanId) {
+        handleRegisterAndPay(selectedPlanId);
+      } else {
+        setSignUpStep("plan");
+      }
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({ title: "Validation Error", description: error.errors[0].message, variant: "destructive" });
