@@ -76,9 +76,10 @@
     <meta name="twitter:site" content="@QuickMenuDish" />
     <meta name="twitter:image" content="/og-image.png" />
     
-    <!-- Razorpay SDK - Preload for better mobile performance -->
+    <!-- Razorpay SDK - Load directly for better reliability -->
     <link rel="preconnect" href="https://checkout.razorpay.com" />
     <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
+    <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
   </head>
 
   <body>

@@ -40,7 +40,7 @@ export interface RegistrationData {
 }
 
 // Load Razorpay script dynamically with retry logic
-export const loadRazorpayScript = (retries = 3): Promise<boolean> => {
+export const loadRazorpayScript = (retries = 5, waitTime = 500): Promise<boolean> => {
   return new Promise((resolve) => {
     // Check if already loaded
     if (window.Razorpay) {
@@ -49,30 +49,31 @@ export const loadRazorpayScript = (retries = 3): Promise<boolean> => {
       return;
     }
 
-    // Check if script tag already exists
+    // Check if script tag already exists (from HTML or previous attempt)
     const existingScript = document.querySelector('script[src*="razorpay.com"]');
     if (existingScript) {
       console.log("⏳ Razorpay script tag exists, waiting for load...");
-      // Wait a bit for it to load
+      // Wait for it to load with exponential backoff
       setTimeout(() => {
         if (window.Razorpay) {
+          console.log("✅ Razorpay SDK loaded from existing script");
           resolve(true);
         } else if (retries > 0) {
-          console.log(`🔄 Retrying Razorpay load (${retries} attempts left)...`);
-          resolve(loadRazorpayScript(retries - 1));
+          console.log(`🔄 Waiting for Razorpay (${retries} attempts left)...`);
+          resolve(loadRazorpayScript(retries - 1, Math.min(waitTime * 1.5, 3000)));
         } else {
-          console.error("❌ Razorpay SDK failed to load after retries");
+          console.error("❌ Razorpay SDK failed to load - timeout");
           resolve(false);
         }
-      }, 1000);
+      }, waitTime);
       return;
     }
 
-    console.log("📥 Loading Razorpay SDK...");
+    // If no script exists, create one (fallback)
+    console.log("📥 Creating Razorpay SDK script tag...");
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
-    script.crossOrigin = "anonymous";
     
     script.onload = () => {
       console.log("✅ Razorpay SDK loaded successfully");
@@ -81,13 +82,12 @@ export const loadRazorpayScript = (retries = 3): Promise<boolean> => {
     
     script.onerror = (error) => {
       console.error("❌ Razorpay SDK load error:", error);
-      // Remove failed script
       script.remove();
       
       if (retries > 0) {
         console.log(`🔄 Retrying Razorpay load (${retries} attempts left)...`);
         setTimeout(() => {
-          resolve(loadRazorpayScript(retries - 1));
+          resolve(loadRazorpayScript(retries - 1, waitTime));
         }, 1000);
       } else {
         console.error("❌ Razorpay SDK failed to load after all retries");
@@ -95,7 +95,7 @@ export const loadRazorpayScript = (retries = 3): Promise<boolean> => {
       }
     };
     
-    document.body.appendChild(script);
+    document.head.appendChild(script);
   });
 };
 
