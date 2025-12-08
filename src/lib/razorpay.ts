@@ -39,18 +39,62 @@ export interface RegistrationData {
   billingCycle: "monthly" | "yearly";
 }
 
-// Load Razorpay script dynamically
-export const loadRazorpayScript = (): Promise<boolean> => {
+// Load Razorpay script dynamically with retry logic
+export const loadRazorpayScript = (retries = 3): Promise<boolean> => {
   return new Promise((resolve) => {
+    // Check if already loaded
     if (window.Razorpay) {
+      console.log("✅ Razorpay SDK already loaded");
       resolve(true);
       return;
     }
 
+    // Check if script tag already exists
+    const existingScript = document.querySelector('script[src*="razorpay.com"]');
+    if (existingScript) {
+      console.log("⏳ Razorpay script tag exists, waiting for load...");
+      // Wait a bit for it to load
+      setTimeout(() => {
+        if (window.Razorpay) {
+          resolve(true);
+        } else if (retries > 0) {
+          console.log(`🔄 Retrying Razorpay load (${retries} attempts left)...`);
+          resolve(loadRazorpayScript(retries - 1));
+        } else {
+          console.error("❌ Razorpay SDK failed to load after retries");
+          resolve(false);
+        }
+      }, 1000);
+      return;
+    }
+
+    console.log("📥 Loading Razorpay SDK...");
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    
+    script.onload = () => {
+      console.log("✅ Razorpay SDK loaded successfully");
+      resolve(true);
+    };
+    
+    script.onerror = (error) => {
+      console.error("❌ Razorpay SDK load error:", error);
+      // Remove failed script
+      script.remove();
+      
+      if (retries > 0) {
+        console.log(`🔄 Retrying Razorpay load (${retries} attempts left)...`);
+        setTimeout(() => {
+          resolve(loadRazorpayScript(retries - 1));
+        }, 1000);
+      } else {
+        console.error("❌ Razorpay SDK failed to load after all retries");
+        resolve(false);
+      }
+    };
+    
     document.body.appendChild(script);
   });
 };

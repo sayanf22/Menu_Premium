@@ -53,62 +53,73 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
         throw new Error("Payment gateway not configured");
       }
 
-      await openRazorpayCheckout({
-        key: razorpayKeyId,
-        subscription_id: subscriptionId,
-        name: "AddMenu",
-        description: `${planName} - ${billingCycle} subscription`,
-        prefill: {
-          email: user.email || "",
-        },
-        theme: {
-          color: "#f97316",
-        },
-        handler: async (response) => {
-          try {
-            const { success, error: verifyError } = await verifyPayment(
-              response.razorpay_payment_id,
-              response.razorpay_subscription_id,
-              response.razorpay_signature
-            );
-
-            if (!success) {
-              throw new Error(verifyError || "Payment verification failed");
-            }
-
-            toast({
-              title: "🎉 Subscription activated!",
-              description: `Welcome to ${planName}!`,
-            });
-
-            await refreshSubscription();
-            onSuccess?.();
-            
-            // Redirect based on plan
-            const plan = plans.find(p => p.id === planId);
-            if (plan?.has_orders_feature) {
-              navigate("/dashboard");
-            } else {
-              navigate("/menu-dashboard");
-            }
-          } catch (err: any) {
-            toast({
-              title: "Verification failed",
-              description: err.message,
-              variant: "destructive",
-            });
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setLoadingPlan(null);
-            toast({
-              title: "Payment cancelled",
-              description: "You can try again anytime",
-            });
+      try {
+        await openRazorpayCheckout({
+          key: razorpayKeyId,
+          subscription_id: subscriptionId,
+          name: "AddMenu",
+          description: `${planName} - ${billingCycle} subscription`,
+          prefill: {
+            email: user.email || "",
           },
-        },
-      });
+          theme: {
+            color: "#f97316",
+          },
+          handler: async (response) => {
+            try {
+              const { success, error: verifyError } = await verifyPayment(
+                response.razorpay_payment_id,
+                response.razorpay_subscription_id,
+                response.razorpay_signature
+              );
+
+              if (!success) {
+                throw new Error(verifyError || "Payment verification failed");
+              }
+
+              toast({
+                title: "🎉 Subscription activated!",
+                description: `Welcome to ${planName}!`,
+              });
+
+              await refreshSubscription();
+              onSuccess?.();
+              
+              // Redirect based on plan
+              const plan = plans.find(p => p.id === planId);
+              if (plan?.has_orders_feature) {
+                navigate("/dashboard");
+              } else {
+                navigate("/menu-dashboard");
+              }
+            } catch (err: any) {
+              toast({
+                title: "Verification failed",
+                description: err.message,
+                variant: "destructive",
+              });
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setLoadingPlan(null);
+              toast({
+                title: "Payment cancelled",
+                description: "You can try again anytime",
+              });
+            },
+          },
+        });
+      } catch (sdkError: any) {
+        // Handle SDK loading errors specifically
+        toast({
+          title: "Payment Gateway Error",
+          description: sdkError.message || "Failed to load payment gateway. Please check your internet connection and try again.",
+          variant: "destructive",
+        });
+        setLoadingPlan(null);
+        return;
+      }
     } catch (err: any) {
       toast({
         title: "Error",
