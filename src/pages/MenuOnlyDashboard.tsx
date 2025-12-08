@@ -478,7 +478,7 @@ const MenuOnlyDashboard = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <Crown className="h-4 w-4 text-amber-500" />
                       <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                        {open ? "Upgrade to Full Service" : ""}
+                        {open ? "Upgrade to Premium" : ""}
                       </span>
                     </div>
                     {open && (
@@ -553,7 +553,7 @@ const Logo = ({ name, logo }: { name: string; logo: string | null }) => {
       >
         {name}
       </motion.span>
-      <Badge variant="secondary" className="text-xs ml-1">Menu Only</Badge>
+      <Badge variant="secondary" className="text-xs ml-1">Advanced</Badge>
     </div>
   );
 };

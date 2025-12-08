@@ -111,7 +111,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const hasOrdersFeature = subscription?.has_orders_feature ?? false;
-  const isMenuOnlyPlan = subscription?.plan_slug === "menu-only" || !subscription?.has_orders_feature;
+  const isMenuOnlyPlan = subscription?.plan_slug === "menu-only" || subscription?.plan_slug === "advanced" || !subscription?.has_orders_feature;
+  const isAdvancedPlan = subscription?.plan_slug === "menu-only" || subscription?.plan_slug === "advanced";
+  const isPremiumPlan = subscription?.plan_slug === "full-service" || subscription?.plan_slug === "premium" || subscription?.has_orders_feature;
 
   return (
     <SubscriptionContext.Provider
