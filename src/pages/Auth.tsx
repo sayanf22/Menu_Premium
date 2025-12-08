@@ -200,7 +200,7 @@ const Auth = () => {
         modal: {
           ondismiss: () => {
             setLoading(false);
-            toast({ title: "Payment cancelled", description: "You can try again within 30 minutes" });
+            toast({ title: "Payment cancelled", description: "You can try again in 1 minute" });
           },
         },
       });
