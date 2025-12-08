@@ -7,17 +7,29 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Eye, EyeOff, Loader2, ArrowLeft, ArrowRight, Check, Lock, Star, CreditCard
+  Eye, EyeOff, Loader2, ArrowLeft, ArrowRight, Check, Lock, Star, CreditCard, ShieldCheck, CheckCircle2, Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { isRateLimited, RATE_LIMITS, getClientFingerprint, isBlocked, sanitizeInput } from "@/lib/security";
 import { useSubscription } from "@/hooks/useSubscription";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   createRegistrationSubscription, 
   verifyRegistrationPayment, 
   openRazorpayCheckout
 } from "@/lib/razorpay";
+
+// Loading overlay states
+type LoadingState = 'idle' | 'creating' | 'payment' | 'verifying' | 'success';
+
+const loadingMessages: Record<LoadingState, { title: string; subtitle: string; icon: 'loader' | 'card' | 'shield' | 'check' }> = {
+  idle: { title: '', subtitle: '', icon: 'loader' },
+  creating: { title: 'Preparing Your Subscription', subtitle: 'Setting up payment gateway...', icon: 'loader' },
+  payment: { title: 'Complete Your Payment', subtitle: 'Razorpay checkout is open', icon: 'card' },
+  verifying: { title: 'Verifying Payment', subtitle: 'Please wait while we confirm your payment...', icon: 'shield' },
+  success: { title: 'Payment Successful!', subtitle: 'Creating your account...', icon: 'check' },
+};
 
 const authSchema = z.object({
   email: z.string().email("Please enter a valid email address").max(254, "Email too long"),
@@ -32,6 +44,8 @@ const Auth = () => {
   const { plans } = useSubscription();
   
   const [loading, setLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  const [selectedPlanName, setSelectedPlanName] = useState<string>('');
   const [activeTab, setActiveTab] = useState<"signin" | "signup">(searchParams.get("mode") === "signup" ? "signup" : "signin");
   const [signUpStep, setSignUpStep] = useState<"form" | "plan">("form");
   const [email, setEmail] = useState("");
@@ -44,6 +58,27 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Reset loading state helper
+  const resetLoadingState = () => {
+    setLoadingState('idle');
+    setLoading(false);
+    setSelectedPlanName('');
+  };
+
+  // Render loading icon based on state
+  const renderLoadingIcon = (iconType: 'loader' | 'card' | 'shield' | 'check') => {
+    switch (iconType) {
+      case 'card':
+        return <CreditCard className="h-12 w-12 text-orange-500" />;
+      case 'shield':
+        return <ShieldCheck className="h-12 w-12 text-orange-500 animate-pulse" />;
+      case 'check':
+        return <CheckCircle2 className="h-12 w-12 text-green-500" />;
+      default:
+        return <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />;
+    }
+  };
 
   useEffect(() => {
     checkUser();
@@ -156,8 +191,16 @@ const Auth = () => {
       toast({ title: "Too many attempts", description: "Please wait before trying again", variant: "destructive" });
       return;
     }
+    
+    // Find plan name for display
+    const plan = plans.find(p => p.id === planId);
+    const planDisplayName = plan?.name || 'Selected';
+    
     setLoading(true);
     setSelectedPlanId(planId);
+    setSelectedPlanName(planDisplayName);
+    setLoadingState('creating');
+    
     try {
       const billingCycle = isYearly ? "yearly" : "monthly";
       const { subscriptionId, planName, razorpayKeyId, error } = await createRegistrationSubscription({
@@ -171,6 +214,9 @@ const Auth = () => {
       if (error || !subscriptionId) throw new Error(error || "Failed to create subscription");
       if (!razorpayKeyId) throw new Error("Payment gateway not configured");
 
+      // Update to payment state
+      setLoadingState('payment');
+
       await openRazorpayCheckout({
         key: razorpayKeyId,
         subscription_id: subscriptionId,
@@ -179,7 +225,9 @@ const Auth = () => {
         prefill: { email, name: restaurantName },
         theme: { color: "#f97316" },
         handler: async (response) => {
-          setLoading(true);
+          // Update to verifying state
+          setLoadingState('verifying');
+          
           try {
             const result = await verifyRegistrationPayment(
               response.razorpay_payment_id,
@@ -187,31 +235,40 @@ const Auth = () => {
               response.razorpay_signature
             );
             if (!result.success) throw new Error(result.error || "Payment verification failed");
+            
+            // Update to success state
+            setLoadingState('success');
+            
             toast({ title: "🎉 Account Created!", description: "Signing you in..." });
             const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
             if (signInError) {
               toast({ title: "Account created", description: "Please sign in" });
+              resetLoadingState();
               setActiveTab("signin");
               setSignUpStep("form");
               return;
             }
-            navigate(result.hasOrdersFeature ? "/dashboard" : "/menu-dashboard");
+            
+            // Wait a moment to show success animation, then redirect
+            setTimeout(() => {
+              navigate(result.hasOrdersFeature ? "/dashboard" : "/menu-dashboard");
+              resetLoadingState();
+            }, 2000);
           } catch (err: any) {
+            resetLoadingState();
             toast({ title: "Verification failed", description: err.message, variant: "destructive" });
-          } finally {
-            setLoading(false);
           }
         },
         modal: {
           ondismiss: () => {
-            setLoading(false);
+            resetLoadingState();
             toast({ title: "Payment cancelled", description: "You can try again in 10 minutes" });
           },
         },
       });
     } catch (err: any) {
+      resetLoadingState();
       toast({ title: "Error", description: err.message, variant: "destructive" });
-      setLoading(false);
     }
   };
 
@@ -226,10 +283,149 @@ const Auth = () => {
     </div>
   );
 
+  // Loading Overlay Component
+  const LoadingOverlay = () => (
+    <AnimatePresence>
+      {loadingState !== 'idle' && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/95 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: "spring", duration: 0.5 }}
+            className="flex flex-col items-center gap-6 p-8 text-center"
+          >
+            {/* Animated Icon Container */}
+            <motion.div
+              key={loadingState}
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", duration: 0.4 }}
+              className="relative"
+            >
+              {/* Pulsing ring for non-success states */}
+              {loadingState !== 'success' && (
+                <motion.div
+                  className="absolute inset-0 rounded-full border-4 border-orange-300"
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  style={{ width: '80px', height: '80px', margin: '-10px' }}
+                />
+              )}
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
+                {renderLoadingIcon(loadingMessages[loadingState].icon)}
+              </div>
+            </motion.div>
+
+            {/* Plan Name Badge */}
+            <motion.div
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              <Badge className="px-4 py-1.5 text-sm font-medium bg-orange-100 text-orange-600 hover:bg-orange-100">
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                {selectedPlanName} Plan
+              </Badge>
+            </motion.div>
+
+            {/* Loading Message */}
+            <motion.div
+              key={`msg-${loadingState}`}
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-2"
+            >
+              <h3 className="text-xl font-semibold text-gray-900">
+                {loadingMessages[loadingState].title}
+              </h3>
+              <p className="text-gray-500">
+                {loadingMessages[loadingState].subtitle}
+              </p>
+            </motion.div>
+
+            {/* Progress Steps */}
+            <motion.div
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex items-center gap-2 mt-4"
+            >
+              {(['creating', 'payment', 'verifying', 'success'] as LoadingState[]).map((step, idx) => {
+                const stepOrder = ['creating', 'payment', 'verifying', 'success'];
+                const currentIdx = stepOrder.indexOf(loadingState);
+                const stepIdx = stepOrder.indexOf(step);
+                const isActive = stepIdx === currentIdx;
+                const isCompleted = stepIdx < currentIdx;
+                
+                return (
+                  <div key={step} className="flex items-center">
+                    <motion.div
+                      className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                        isCompleted ? 'bg-green-500' : isActive ? 'bg-orange-500' : 'bg-gray-200'
+                      }`}
+                      animate={isActive ? { scale: [1, 1.2, 1] } : {}}
+                      transition={{ duration: 0.8, repeat: isActive ? Infinity : 0 }}
+                    />
+                    {idx < 3 && (
+                      <div className={`h-0.5 w-6 mx-1 transition-colors ${
+                        isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
+            </motion.div>
+
+            {/* Success Confetti Effect */}
+            {loadingState === 'success' && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+              >
+                {[...Array(12)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-3 h-3 rounded-full"
+                    style={{
+                      background: ['#f97316', '#22c55e', '#3b82f6', '#eab308'][i % 4],
+                      left: `${10 + (i * 7)}%`,
+                      top: '50%',
+                    }}
+                    initial={{ y: 0, opacity: 1 }}
+                    animate={{
+                      y: [0, -100 - Math.random() * 100],
+                      x: [0, (Math.random() - 0.5) * 100],
+                      opacity: [1, 0],
+                      scale: [1, 0.5],
+                    }}
+                    transition={{
+                      duration: 1 + Math.random() * 0.5,
+                      delay: i * 0.05,
+                      ease: "easeOut",
+                    }}
+                  />
+                ))}
+              </motion.div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   // Plan selection screen
   if (signUpStep === "plan") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-50/30 flex items-center justify-center p-4">
+        <LoadingOverlay />
         <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur">
           <CardContent className="p-8">
             <Logo />
@@ -356,6 +552,7 @@ const Auth = () => {
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-50/30 flex items-center justify-center p-4">
+        <LoadingOverlay />
         <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur">
           <CardContent className="p-8">
             <Logo />
@@ -415,6 +612,7 @@ const Auth = () => {
   // Main auth screen (Sign In / Sign Up)
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-50/30 flex items-center justify-center p-4">
+      <LoadingOverlay />
       <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur">
         <CardContent className="p-8">
           <Logo />
