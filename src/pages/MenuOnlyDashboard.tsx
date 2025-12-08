@@ -57,6 +57,9 @@ const MenuOnlyDashboard = () => {
   const [serviceCallNotification, setServiceCallNotification] = useState<ServiceCall | null>(null);
   const serviceCallSoundRef = useRef<NodeJS.Timeout | null>(null);
   const serviceCallAudioRef = useRef<AudioContext | null>(null);
+  const serviceCallChannelRef = useRef<any>(null);
+  const processedServiceCallIds = useRef<Set<string>>(new Set());
+  const serviceCallInitialLoadDone = useRef(false);
 
   // If user has orders feature, redirect to full dashboard
   useEffect(() => {
@@ -125,6 +128,86 @@ const MenuOnlyDashboard = () => {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Subscribe to service calls at dashboard level (always active)
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    // First, fetch existing service calls to mark them as processed
+    const initializeServiceCalls = async () => {
+      try {
+        const { data } = await supabase
+          .from("service_calls")
+          .select("id")
+          .eq("restaurant_id", restaurantId)
+          .in("status", ["pending", "acknowledged"]);
+        
+        if (data) {
+          data.forEach(call => processedServiceCallIds.current.add(call.id));
+        }
+        serviceCallInitialLoadDone.current = true;
+        console.log('📞 Menu Dashboard: Service calls initialized:', data?.length || 0);
+      } catch (err) {
+        console.error('Error initializing service calls:', err);
+        serviceCallInitialLoadDone.current = true;
+      }
+    };
+
+    initializeServiceCalls();
+
+    const channelName = `menu-dashboard-service-calls-${restaurantId}-${Date.now()}`;
+    
+    serviceCallChannelRef.current = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "service_calls",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        (payload) => {
+          const newCall = payload.new as ServiceCall;
+          console.log('🔔 Menu Dashboard: New service call received', newCall);
+          
+          // Skip if already processed
+          if (processedServiceCallIds.current.has(newCall.id)) {
+            console.log('⏭️ Skipping already processed service call');
+            return;
+          }
+          
+          // Skip if initial load not done
+          if (!serviceCallInitialLoadDone.current) {
+            console.log('⏭️ Skipping service call - initial load not done');
+            processedServiceCallIds.current.add(newCall.id);
+            return;
+          }
+          
+          processedServiceCallIds.current.add(newCall.id);
+          
+          // Trigger notification with sound
+          handleNewServiceCall(newCall);
+          
+          toast({
+            title: `🔔 ${newCall.call_type.charAt(0).toUpperCase() + newCall.call_type.slice(1)} Request!`,
+            description: `Table ${newCall.table_number} needs ${newCall.call_type}`,
+            duration: 10000,
+          });
+          
+          console.log('✅ Menu Dashboard: Service call notification triggered');
+        }
+      )
+      .subscribe((status) => {
+        console.log('📞 Menu Dashboard service calls realtime status:', status);
+      });
+
+    return () => {
+      if (serviceCallChannelRef.current) {
+        supabase.removeChannel(serviceCallChannelRef.current);
+      }
+    };
+  }, [restaurantId]);
 
   const checkAuth = async () => {
     try {
