@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import {
   Crown,
   Sparkles,
   CreditCard,
-  AlertCircle
+  AlertCircle,
+  X
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +34,14 @@ import SubscriptionManagement from "@/components/dashboard/SubscriptionManagemen
 import ServiceCallsPanel from "@/components/dashboard/ServiceCallsPanel";
 import { useSubscription } from "@/hooks/useSubscription";
 
+interface ServiceCall {
+  id: string;
+  table_number: string;
+  call_type: "waiter" | "water" | "bill";
+  status: string;
+  created_at: string;
+}
+
 const MenuOnlyDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -45,6 +54,9 @@ const MenuOnlyDashboard = () => {
   const [activeTab, setActiveTab] = useState("menu");
   const [open, setOpen] = useState(false);
   const [serviceCallsCount, setServiceCallsCount] = useState(0);
+  const [serviceCallNotification, setServiceCallNotification] = useState<ServiceCall | null>(null);
+  const serviceCallSoundRef = useRef<NodeJS.Timeout | null>(null);
+  const serviceCallAudioRef = useRef<AudioContext | null>(null);
 
   // If user has orders feature, redirect to full dashboard
   useEffect(() => {
@@ -152,6 +164,97 @@ const MenuOnlyDashboard = () => {
     navigate("/");
   };
 
+  const dismissServiceCallNotification = () => {
+    setServiceCallNotification(null);
+    if (serviceCallSoundRef.current) {
+      clearInterval(serviceCallSoundRef.current);
+      serviceCallSoundRef.current = null;
+    }
+  };
+
+  // Bell ringing sound for service calls (6+ seconds)
+  const playServiceCallBellSound = () => {
+    if (serviceCallSoundRef.current) {
+      clearInterval(serviceCallSoundRef.current);
+    }
+
+    if (!serviceCallAudioRef.current) {
+      serviceCallAudioRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    const ctx = serviceCallAudioRef.current;
+    if (ctx.state === "suspended") ctx.resume();
+
+    let ringCount = 0;
+    const maxRings = 8;
+
+    const playBellRing = () => {
+      if (ringCount >= maxRings) {
+        if (serviceCallSoundRef.current) {
+          clearInterval(serviceCallSoundRef.current);
+          serviceCallSoundRef.current = null;
+        }
+        return;
+      }
+
+      const now = ctx.currentTime;
+      const bellFrequencies = [
+        { freq: 830, gain: 0.4 },
+        { freq: 1245, gain: 0.25 },
+        { freq: 1660, gain: 0.15 },
+        { freq: 415, gain: 0.2 },
+      ];
+
+      bellFrequencies.forEach(({ freq, gain: gainValue }) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = "sine";
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(gainValue, now + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(gainValue * 0.3, now + 0.15);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        osc.start(now);
+        osc.stop(now + 0.6);
+      });
+
+      setTimeout(() => {
+        const now2 = ctx.currentTime;
+        [{ freq: 622, gain: 0.35 }, { freq: 933, gain: 0.2 }, { freq: 1244, gain: 0.1 }].forEach(({ freq, gain: gainValue }) => {
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          osc.frequency.value = freq;
+          osc.type = "sine";
+          gainNode.gain.setValueAtTime(0, now2);
+          gainNode.gain.linearRampToValueAtTime(gainValue, now2 + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(gainValue * 0.3, now2 + 0.15);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now2 + 0.5);
+          osc.start(now2);
+          osc.stop(now2 + 0.5);
+        });
+      }, 200);
+
+      ringCount++;
+    };
+
+    playBellRing();
+    serviceCallSoundRef.current = setInterval(playBellRing, 800);
+  };
+
+  const handleNewServiceCall = (call: ServiceCall) => {
+    setServiceCallsCount(prev => prev + 1);
+    setServiceCallNotification(call);
+    playServiceCallBellSound();
+    
+    if ("vibrate" in navigator) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -214,6 +317,57 @@ const MenuOnlyDashboard = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Global Service Call Notification */}
+      {serviceCallNotification && (
+        <Card className="fixed top-16 md:top-4 left-4 right-4 md:left-auto md:right-4 z-[100] md:w-96 shadow-2xl border-2 border-orange-500 animate-in slide-in-from-top-4 duration-500">
+          <CardHeader className="pb-3 bg-orange-500/10 p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-500 rounded-full flex items-center justify-center animate-bounce">
+                  {serviceCallNotification.call_type === 'waiter' && <User className="h-5 w-5 md:h-6 md:w-6 text-white" />}
+                  {serviceCallNotification.call_type === 'water' && <Bell className="h-5 w-5 md:h-6 md:w-6 text-white" />}
+                  {serviceCallNotification.call_type === 'bill' && <FileText className="h-5 w-5 md:h-6 md:w-6 text-white" />}
+                </div>
+                <div>
+                  <CardTitle className="text-lg md:text-xl">🔔 {serviceCallNotification.call_type.charAt(0).toUpperCase() + serviceCallNotification.call_type.slice(1)} Request!</CardTitle>
+                  <p className="text-xs md:text-sm text-muted-foreground">Table {serviceCallNotification.table_number}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={dismissServiceCallNotification} className="h-8 w-8">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-3 p-4">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Request Type:</span>
+                <Badge variant="destructive" className="text-sm md:text-base px-2 md:px-3 py-1 animate-pulse">
+                  {serviceCallNotification.call_type.charAt(0).toUpperCase() + serviceCallNotification.call_type.slice(1)}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Table Number:</span>
+                <Badge variant="default" className="text-sm md:text-base px-2 md:px-3 py-1">
+                  {serviceCallNotification.table_number}
+                </Badge>
+              </div>
+              <Button 
+                onClick={() => {
+                  handleTabChange("service-calls");
+                  setServiceCallsCount(0);
+                  dismissServiceCallNotification();
+                }} 
+                className="w-full mt-3 bg-orange-500 hover:bg-orange-600" 
+                variant="default"
+              >
+                View Service Calls
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Sidebar open={open} setOpen={setOpen}>
@@ -294,7 +448,7 @@ const MenuOnlyDashboard = () => {
         </SidebarBody>
       </Sidebar>
 
-      <Dashboard activeTab={activeTab} restaurantId={restaurantId} onNewServiceCall={() => setServiceCallsCount(prev => prev + 1)} />
+      <Dashboard activeTab={activeTab} restaurantId={restaurantId} onNewServiceCall={handleNewServiceCall} />
     </div>
   );
 };
@@ -333,7 +487,7 @@ const LogoIcon = ({ logo }: { logo: string | null }) => {
   );
 };
 
-const Dashboard = ({ activeTab, restaurantId, onNewServiceCall }: { activeTab: string; restaurantId: string; onNewServiceCall: () => void }) => {
+const Dashboard = ({ activeTab, restaurantId, onNewServiceCall }: { activeTab: string; restaurantId: string; onNewServiceCall: (call: ServiceCall) => void }) => {
   return (
     <div className="flex flex-1 overflow-hidden">
       <div className="p-4 md:p-10 md:rounded-tl-2xl border-t md:border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-4 flex-1 w-full overflow-y-auto">
@@ -341,7 +495,7 @@ const Dashboard = ({ activeTab, restaurantId, onNewServiceCall }: { activeTab: s
         {activeTab === "stats" && <StatsOverview restaurantId={restaurantId} />}
         {activeTab === "social" && <SocialLinksForm restaurantId={restaurantId} />}
         {activeTab === "qr" && <QRCodeDisplay restaurantId={restaurantId} />}
-        {activeTab === "service-calls" && <ServiceCallsPanel restaurantId={restaurantId} onNewCall={onNewServiceCall} />}
+        {activeTab === "service-calls" && <ServiceCallsPanel restaurantId={restaurantId} onNewCall={(call) => onNewServiceCall(call as ServiceCall)} />}
         {activeTab === "subscription" && <SubscriptionManagement />}
         {activeTab === "profile" && <RestaurantProfile restaurantId={restaurantId} />}
       </div>

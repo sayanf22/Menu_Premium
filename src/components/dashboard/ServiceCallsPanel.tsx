@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, User, Droplets, Receipt, Check, Clock, X } from "lucide-react";
+import { Bell, User, Droplets, Receipt, Check, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ServiceCall {
@@ -35,6 +35,7 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
   const [loading, setLoading] = useState(true);
   const channelRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const processedCallIds = useRef<Set<string>>(new Set());
   const initialLoadDone = useRef(false);
 
@@ -133,7 +134,13 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
       .subscribe();
   };
 
+  // Bell ringing sound notification (plays for 6+ seconds)
   const playNotificationSound = () => {
+    // Clear any existing sound interval
+    if (soundIntervalRef.current) {
+      clearInterval(soundIntervalRef.current);
+    }
+
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
@@ -141,23 +148,93 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
     const ctx = audioContextRef.current;
     if (ctx.state === "suspended") ctx.resume();
 
-    // Play a pleasant chime
-    const now = ctx.currentTime;
-    
-    [523.25, 659.25, 783.99].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = freq;
-      osc.type = "sine";
-      gain.gain.setValueAtTime(0, now + i * 0.15);
-      gain.gain.linearRampToValueAtTime(0.2, now + i * 0.15 + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.3);
-      osc.start(now + i * 0.15);
-      osc.stop(now + i * 0.15 + 0.3);
-    });
+    let ringCount = 0;
+    const maxRings = 8; // 8 rings over ~6-7 seconds
+
+    const playBellRing = () => {
+      if (ringCount >= maxRings) {
+        if (soundIntervalRef.current) {
+          clearInterval(soundIntervalRef.current);
+          soundIntervalRef.current = null;
+        }
+        return;
+      }
+
+      const now = ctx.currentTime;
+      
+      // Create a realistic bell sound with multiple harmonics
+      const bellFrequencies = [
+        { freq: 830, gain: 0.4 },   // Main bell tone (high)
+        { freq: 1245, gain: 0.25 }, // First harmonic
+        { freq: 1660, gain: 0.15 }, // Second harmonic
+        { freq: 415, gain: 0.2 },   // Lower undertone
+      ];
+
+      bellFrequencies.forEach(({ freq, gain: gainValue }) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc.frequency.value = freq;
+        osc.type = "sine";
+        
+        // Bell-like envelope: quick attack, long decay
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(gainValue, now + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(gainValue * 0.3, now + 0.15);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        
+        osc.start(now);
+        osc.stop(now + 0.6);
+      });
+
+      // Add a second strike for "ding-dong" effect
+      setTimeout(() => {
+        const now2 = ctx.currentTime;
+        const secondBellFreqs = [
+          { freq: 622, gain: 0.35 },  // Lower tone for "dong"
+          { freq: 933, gain: 0.2 },
+          { freq: 1244, gain: 0.1 },
+        ];
+
+        secondBellFreqs.forEach(({ freq, gain: gainValue }) => {
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.frequency.value = freq;
+          osc.type = "sine";
+          
+          gainNode.gain.setValueAtTime(0, now2);
+          gainNode.gain.linearRampToValueAtTime(gainValue, now2 + 0.01);
+          gainNode.gain.exponentialRampToValueAtTime(gainValue * 0.3, now2 + 0.15);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now2 + 0.5);
+          
+          osc.start(now2);
+          osc.stop(now2 + 0.5);
+        });
+      }, 200);
+
+      ringCount++;
+    };
+
+    // Play immediately and then every 800ms for ding-dong pattern
+    playBellRing();
+    soundIntervalRef.current = setInterval(playBellRing, 800);
   };
+
+  // Stop sound when component unmounts or when all calls are handled
+  useEffect(() => {
+    return () => {
+      if (soundIntervalRef.current) {
+        clearInterval(soundIntervalRef.current);
+      }
+    };
+  }, []);
 
   const updateCallStatus = async (callId: string, status: "acknowledged" | "completed") => {
     try {
@@ -277,8 +354,8 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-lg">Table {call.table_number}</span>
-                              <Badge variant={isPending ? "destructive" : "secondary"}>
-                                {isPending ? "Pending" : "Acknowledged"}
+                              <Badge variant="destructive" className="animate-pulse">
+                                {CALL_CONFIG[call.call_type].label}
                               </Badge>
                             </div>
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -287,28 +364,22 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isPending && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateCallStatus(call.id, "acknowledged")}
-                              className="gap-1"
-                            >
-                              <Check className="w-4 h-4" />
-                              Acknowledge
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant={isPending ? "default" : "outline"}
-                            onClick={() => updateCallStatus(call.id, "completed")}
-                            className="gap-1"
-                          >
-                            <X className="w-4 h-4" />
-                            Done
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => {
+                            // Stop sound when marking as done
+                            if (soundIntervalRef.current) {
+                              clearInterval(soundIntervalRef.current);
+                              soundIntervalRef.current = null;
+                            }
+                            updateCallStatus(call.id, "completed");
+                          }}
+                          className="gap-1 bg-green-500 hover:bg-green-600"
+                        >
+                          <Check className="w-4 h-4" />
+                          Done
+                        </Button>
                       </div>
                     </div>
                   </Card>

@@ -31,6 +31,7 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
   });
   const [, setPendingCalls] = useState<any[]>([]);
   const channelRef = useRef<any>(null);
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [localTableNumber, setLocalTableNumber] = useState(() => 
     localStorage.getItem(`service_table_${restaurantId}`) || ""
   );
@@ -46,9 +47,36 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
     }
   };
 
+  // Auto-close realtime connection after 2 minutes of inactivity
+  const resetAutoCloseTimer = () => {
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+    }
+    autoCloseTimerRef.current = setTimeout(() => {
+      // Close the modal and disconnect realtime after 2 minutes
+      setIsOpen(false);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    }, 2 * 60 * 1000); // 2 minutes
+  };
+
+  // Cleanup auto-close timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
+    };
+  }, []);
+
   // Subscribe to realtime updates only when modal is open
   useEffect(() => {
     if (!isOpen || !restaurantId || !tableNumber) return;
+
+    // Start auto-close timer when modal opens
+    resetAutoCloseTimer();
 
     // Fetch existing pending calls for this table
     const fetchPendingCalls = async () => {
@@ -125,6 +153,9 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current);
+      }
     };
   }, [isOpen, restaurantId, tableNumber, toast]);
 
@@ -137,6 +168,9 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
       });
       return;
     }
+
+    // Reset auto-close timer on user activity
+    resetAutoCloseTimer();
 
     // Rate limit: 3 calls per minute per type
     const rateLimitKey = `service_call_${callType}_${getClientFingerprint()}`;
