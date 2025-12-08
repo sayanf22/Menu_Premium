@@ -5,10 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Check, X, Loader2, Crown, Sparkles } from "lucide-react";
+import { Check, X, Loader2, Crown, Sparkles, CreditCard, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   createSubscription, 
   verifyPayment, 
@@ -19,12 +20,31 @@ interface SubscriptionPricingProps {
   onSuccess?: () => void;
 }
 
+// Loading overlay states
+type LoadingState = 'idle' | 'creating' | 'payment' | 'verifying' | 'success';
+
+const loadingMessages: Record<LoadingState, { title: string; subtitle: string; icon: 'loader' | 'card' | 'shield' | 'check' }> = {
+  idle: { title: '', subtitle: '', icon: 'loader' },
+  creating: { title: 'Preparing Your Subscription', subtitle: 'Setting up payment gateway...', icon: 'loader' },
+  payment: { title: 'Complete Your Payment', subtitle: 'Razorpay checkout is open', icon: 'card' },
+  verifying: { title: 'Verifying Payment', subtitle: 'Please wait while we confirm your payment...', icon: 'shield' },
+  success: { title: 'Payment Successful!', subtitle: 'Redirecting to your dashboard...', icon: 'check' },
+};
+
 const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { plans, subscription, refreshSubscription } = useSubscription();
   const [isYearly, setIsYearly] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  const [selectedPlanName, setSelectedPlanName] = useState<string>('');
+
+  const resetLoadingState = () => {
+    setLoadingState('idle');
+    setLoadingPlan(null);
+    setSelectedPlanName('');
+  };
 
   const handleSubscribe = async (planId: string, planName: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -39,7 +59,10 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
       return;
     }
 
+    // Set initial loading state
     setLoadingPlan(planId);
+    setSelectedPlanName(planName);
+    setLoadingState('creating');
 
     try {
       const billingCycle = isYearly ? "yearly" : "monthly";
@@ -52,6 +75,9 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
       if (!razorpayKeyId) {
         throw new Error("Payment gateway not configured");
       }
+
+      // Update state to payment
+      setLoadingState('payment');
 
       try {
         await openRazorpayCheckout({
@@ -66,6 +92,9 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
             color: "#f97316",
           },
           handler: async (response) => {
+            // Update state to verifying
+            setLoadingState('verifying');
+            
             try {
               const { success, error: verifyError } = await verifyPayment(
                 response.razorpay_payment_id,
@@ -77,6 +106,9 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
                 throw new Error(verifyError || "Payment verification failed");
               }
 
+              // Update state to success
+              setLoadingState('success');
+
               toast({
                 title: "🎉 Subscription activated!",
                 description: `Welcome to ${planName}!`,
@@ -85,14 +117,18 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
               await refreshSubscription();
               onSuccess?.();
               
-              // Redirect based on plan
-              const plan = plans.find(p => p.id === planId);
-              if (plan?.has_orders_feature) {
-                navigate("/dashboard");
-              } else {
-                navigate("/menu-dashboard");
-              }
+              // Wait a moment to show success animation, then redirect
+              setTimeout(() => {
+                const plan = plans.find(p => p.id === planId);
+                if (plan?.has_orders_feature) {
+                  navigate("/dashboard");
+                } else {
+                  navigate("/menu-dashboard");
+                }
+                resetLoadingState();
+              }, 2000);
             } catch (err: any) {
+              resetLoadingState();
               toast({
                 title: "Verification failed",
                 description: err.message,
@@ -102,7 +138,7 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
           },
           modal: {
             ondismiss: () => {
-              setLoadingPlan(null);
+              resetLoadingState();
               toast({
                 title: "Payment cancelled",
                 description: "You can try again anytime",
@@ -111,23 +147,21 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
           },
         });
       } catch (sdkError: any) {
-        // Handle SDK loading errors specifically
+        resetLoadingState();
         toast({
           title: "Payment Gateway Error",
           description: sdkError.message || "Failed to load payment gateway. Please check your internet connection and try again.",
           variant: "destructive",
         });
-        setLoadingPlan(null);
         return;
       }
     } catch (err: any) {
+      resetLoadingState();
       toast({
         title: "Error",
         description: err.message || "Something went wrong",
         variant: "destructive",
       });
-    } finally {
-      setLoadingPlan(null);
     }
   };
 
@@ -139,8 +173,158 @@ const SubscriptionPricing = ({ onSuccess }: SubscriptionPricingProps) => {
     }).format(price);
   };
 
+  // Render loading icon based on state
+  const renderLoadingIcon = (iconType: 'loader' | 'card' | 'shield' | 'check') => {
+    switch (iconType) {
+      case 'card':
+        return <CreditCard className="h-12 w-12 text-primary" />;
+      case 'shield':
+        return <ShieldCheck className="h-12 w-12 text-primary animate-pulse" />;
+      case 'check':
+        return <CheckCircle2 className="h-12 w-12 text-green-500" />;
+      default:
+        return <Loader2 className="h-12 w-12 text-primary animate-spin" />;
+    }
+  };
+
   return (
     <div className="space-y-8">
+      {/* Full-screen Loading Overlay */}
+      <AnimatePresence>
+        {loadingState !== 'idle' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="flex flex-col items-center gap-6 p-8 text-center"
+            >
+              {/* Animated Icon Container */}
+              <motion.div
+                key={loadingState}
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", duration: 0.4 }}
+                className="relative"
+              >
+                {/* Pulsing ring for non-success states */}
+                {loadingState !== 'success' && (
+                  <motion.div
+                    className="absolute inset-0 rounded-full border-4 border-primary/30"
+                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                    style={{ width: '80px', height: '80px', margin: '-10px' }}
+                  />
+                )}
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  {renderLoadingIcon(loadingMessages[loadingState].icon)}
+                </div>
+              </motion.div>
+
+              {/* Plan Name Badge */}
+              <motion.div
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+              >
+                <Badge variant="secondary" className="px-4 py-1.5 text-sm font-medium">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  {selectedPlanName} Plan
+                </Badge>
+              </motion.div>
+
+              {/* Loading Message */}
+              <motion.div
+                key={`msg-${loadingState}`}
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="space-y-2"
+              >
+                <h3 className="text-xl font-semibold">
+                  {loadingMessages[loadingState].title}
+                </h3>
+                <p className="text-muted-foreground">
+                  {loadingMessages[loadingState].subtitle}
+                </p>
+              </motion.div>
+
+              {/* Progress Steps */}
+              <motion.div
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-2 mt-4"
+              >
+                {(['creating', 'payment', 'verifying', 'success'] as LoadingState[]).map((step, idx) => {
+                  const stepOrder = ['creating', 'payment', 'verifying', 'success'];
+                  const currentIdx = stepOrder.indexOf(loadingState);
+                  const stepIdx = stepOrder.indexOf(step);
+                  const isActive = stepIdx === currentIdx;
+                  const isCompleted = stepIdx < currentIdx;
+                  
+                  return (
+                    <div key={step} className="flex items-center">
+                      <motion.div
+                        className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                          isCompleted ? 'bg-green-500' : isActive ? 'bg-primary' : 'bg-muted'
+                        }`}
+                        animate={isActive ? { scale: [1, 1.2, 1] } : {}}
+                        transition={{ duration: 0.8, repeat: isActive ? Infinity : 0 }}
+                      />
+                      {idx < 3 && (
+                        <div className={`h-0.5 w-6 mx-1 transition-colors ${
+                          isCompleted ? 'bg-green-500' : 'bg-muted'
+                        }`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </motion.div>
+
+              {/* Success Confetti Effect */}
+              {loadingState === 'success' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 pointer-events-none overflow-hidden"
+                >
+                  {[...Array(12)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-3 h-3 rounded-full"
+                      style={{
+                        background: ['#f97316', '#22c55e', '#3b82f6', '#eab308'][i % 4],
+                        left: `${10 + (i * 7)}%`,
+                        top: '50%',
+                      }}
+                      initial={{ y: 0, opacity: 1 }}
+                      animate={{
+                        y: [0, -100 - Math.random() * 100],
+                        x: [0, (Math.random() - 0.5) * 100],
+                        opacity: [1, 0],
+                        scale: [1, 0.5],
+                      }}
+                      transition={{
+                        duration: 1 + Math.random() * 0.5,
+                        delay: i * 0.05,
+                        ease: "easeOut",
+                      }}
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Billing Toggle */}
       <div className="flex items-center justify-center gap-4">
         <Label htmlFor="billing-toggle" className={!isYearly ? "font-semibold" : "text-muted-foreground"}>
