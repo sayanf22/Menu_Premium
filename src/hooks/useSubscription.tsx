@@ -30,6 +30,8 @@ interface SubscriptionContextType {
   loading: boolean;
   hasOrdersFeature: boolean;
   isMenuOnlyPlan: boolean;
+  isPremiumPlan: boolean;
+  menuItemLimit: number; // 50 for Advanced, Infinity for Premium
   refreshSubscription: () => Promise<void>;
 }
 
@@ -49,6 +51,8 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   loading: true,
   hasOrdersFeature: false,
   isMenuOnlyPlan: true,
+  isPremiumPlan: false,
+  menuItemLimit: 50,
   refreshSubscription: async () => {},
 });
 
@@ -67,7 +71,7 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
     if (data) {
       setPlans(data.map(p => ({
         ...p,
-        features: Array.isArray(p.features) ? p.features : JSON.parse(p.features || "[]"),
+        features: Array.isArray(p.features) ? p.features as string[] : JSON.parse(String(p.features) || "[]"),
       })));
     }
   };
@@ -112,8 +116,9 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
 
   const hasOrdersFeature = subscription?.has_orders_feature ?? false;
   const isMenuOnlyPlan = subscription?.plan_slug === "menu-only" || subscription?.plan_slug === "advanced" || !subscription?.has_orders_feature;
-  const isAdvancedPlan = subscription?.plan_slug === "menu-only" || subscription?.plan_slug === "advanced";
   const isPremiumPlan = subscription?.plan_slug === "full-service" || subscription?.plan_slug === "premium" || subscription?.has_orders_feature;
+  // Menu item limits: Advanced = 50, Premium = unlimited
+  const menuItemLimit = isPremiumPlan ? Infinity : 50;
 
   return (
     <SubscriptionContext.Provider
@@ -123,6 +128,8 @@ export const SubscriptionProvider = ({ children }: { children: ReactNode }) => {
         loading,
         hasOrdersFeature,
         isMenuOnlyPlan,
+        isPremiumPlan,
+        menuItemLimit,
         refreshSubscription,
       }}
     >
