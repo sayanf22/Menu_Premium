@@ -39,6 +39,7 @@ const Auth = () => {
   const [restaurantName, setRestaurantName] = useState("");
   const [restaurantDescription, setRestaurantDescription] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [preselectedPlan, setPreselectedPlan] = useState<string | null>(null);
   const [isYearly, setIsYearly] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -46,13 +47,30 @@ const Auth = () => {
 
   useEffect(() => {
     checkUser();
+    // Check for plan parameter in URL (e.g., ?plan=advanced or ?plan=premium)
+    const planParam = searchParams.get("plan");
+    if (planParam) {
+      setPreselectedPlan(planParam.toLowerCase());
+      setActiveTab("signup");
+    }
   }, []);
 
   useEffect(() => {
-    if (plans.length > 0 && !selectedPlanId) {
-      setSelectedPlanId(plans[0].id);
+    if (plans.length > 0) {
+      // If a plan was preselected via URL, find and set it
+      if (preselectedPlan) {
+        const matchedPlan = plans.find(p => 
+          p.slug === preselectedPlan || 
+          p.name.toLowerCase() === preselectedPlan
+        );
+        if (matchedPlan) {
+          setSelectedPlanId(matchedPlan.id);
+        }
+      } else if (!selectedPlanId) {
+        setSelectedPlanId(plans[0].id);
+      }
     }
-  }, [plans]);
+  }, [plans, preselectedPlan]);
 
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();
