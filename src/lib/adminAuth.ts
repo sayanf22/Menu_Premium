@@ -92,3 +92,37 @@ export function clearAdminSession(): void {
 export function isAdminAuthenticated(): boolean {
   return getAdminSession() !== null;
 }
+
+export async function changeAdminPassword(
+  email: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc("update_admin_password" as any, {
+      p_email: email,
+      p_current_password: currentPassword,
+      p_new_password: newPassword,
+    });
+
+    if (error) {
+      console.error("Password change error:", error);
+      return { success: false, error: "Failed to change password" };
+    }
+
+    if (data === true) {
+      // Log the password change
+      await supabase.from("admin_actions_log").insert({
+        admin_email: email,
+        action_type: "password_changed",
+        details: { timestamp: new Date().toISOString() },
+      });
+      return { success: true };
+    }
+
+    return { success: false, error: "Current password is incorrect" };
+  } catch (error) {
+    console.error("Password change error:", error);
+    return { success: false, error: "Connection error. Please try again" };
+  }
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { changeAdminPassword } from "@/lib/adminAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Search, Shield, Power, PowerOff, BarChart3 } from "lucide-react";
+import { LogOut, Search, Shield, Power, PowerOff, BarChart3, CreditCard, Calendar, CheckCircle, XCircle, Clock, Crown, Loader2, Key, Eye, EyeOff } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,16 @@ interface Restaurant {
   is_active: boolean;
   created_at: string;
   logo_url: string | null;
+  user_id: string;
+  subscription?: {
+    id: string;
+    status: string;
+    plan_name: string;
+    plan_slug: string;
+    billing_cycle: string;
+    current_period_end: string | null;
+    has_orders_feature: boolean;
+  } | null;
 }
 
 const AdminDashboardWithSidebar = () => {
@@ -53,6 +64,22 @@ const AdminDashboardWithSidebar = () => {
     restaurant: Restaurant | null;
     newStatus: boolean;
   }>({ open: false, restaurant: null, newStatus: false });
+  const [subscriptionDialog, setSubscriptionDialog] = useState<{
+    open: boolean;
+    restaurant: Restaurant | null;
+  }>({ open: false, restaurant: null });
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [subscriptionMonths, setSubscriptionMonths] = useState<number>(1);
+  const [passwordDialog, setPasswordDialog] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -74,6 +101,7 @@ const AdminDashboardWithSidebar = () => {
   useEffect(() => {
     if (!requireAuth()) return;
     fetchRestaurants();
+    fetchPlans();
     
     const channel = supabase
       .channel(`admin-restaurants-${session?.email}`, {
@@ -104,6 +132,18 @@ const AdminDashboardWithSidebar = () => {
     };
   }, []);
 
+  const fetchPlans = async () => {
+    const { data } = await supabase
+      .from("subscription_plans")
+      .select("*")
+      .eq("is_active", true)
+      .order("price_monthly", { ascending: true });
+    if (data) {
+      setPlans(data);
+      if (data.length > 0) setSelectedPlan(data[0].id);
+    }
+  };
+
   useEffect(() => {
     let filtered = restaurants;
 
@@ -126,13 +166,50 @@ const AdminDashboardWithSidebar = () => {
 
   const fetchRestaurants = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch restaurants with subscription info
+      const { data: restaurantsData, error } = await supabase
         .from("restaurants")
-        .select("id, name, email, phone, is_active, created_at, logo_url")
+        .select("id, name, email, phone, is_active, created_at, logo_url, user_id")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setRestaurants(data || []);
+
+      // Fetch subscriptions for all restaurants
+      const { data: subscriptionsData } = await supabase
+        .from("user_subscriptions")
+        .select(`
+          id,
+          user_id,
+          plan_id,
+          status,
+          billing_cycle,
+          current_period_end
+        `);
+
+      // Fetch plans separately
+      const { data: plansData } = await supabase
+        .from("subscription_plans")
+        .select("id, name, slug, has_orders_feature");
+
+      // Map subscriptions to restaurants
+      const restaurantsWithSubs = (restaurantsData || []).map(r => {
+        const sub = subscriptionsData?.find(s => s.user_id === r.user_id);
+        const plan = sub ? plansData?.find(p => p.id === sub.plan_id) : null;
+        return {
+          ...r,
+          subscription: sub ? {
+            id: sub.id,
+            status: sub.status,
+            plan_name: plan?.name || "Unknown",
+            plan_slug: plan?.slug || "",
+            billing_cycle: sub.billing_cycle,
+            current_period_end: sub.current_period_end,
+            has_orders_feature: plan?.has_orders_feature || false,
+          } : null,
+        };
+      });
+
+      setRestaurants(restaurantsWithSubs);
     } catch (error) {
       console.error("Error fetching restaurants:", error);
       toast({
@@ -191,10 +268,146 @@ const AdminDashboardWithSidebar = () => {
     }
   };
 
+  const handleManageSubscription = (restaurant: Restaurant) => {
+    setSubscriptionDialog({ open: true, restaurant });
+    if (restaurant.subscription) {
+      // Pre-select current plan if exists
+      const currentPlan = plans.find(p => p.slug === restaurant.subscription?.plan_slug);
+      if (currentPlan) setSelectedPlan(currentPlan.id);
+    }
+  };
+
+  const activateSubscription = async () => {
+    const { restaurant } = subscriptionDialog;
+    if (!restaurant || !selectedPlan || !session) return;
+
+    setSubscriptionLoading(true);
+    try {
+      const plan = plans.find(p => p.id === selectedPlan);
+      if (!plan) throw new Error("Plan not found");
+
+      // Use database function to bypass RLS
+      const { data, error } = await supabase.rpc("admin_activate_subscription" as any, {
+        p_user_id: restaurant.user_id,
+        p_restaurant_id: restaurant.id,
+        p_plan_id: selectedPlan,
+        p_billing_cycle: selectedBillingCycle,
+        p_months: subscriptionMonths,
+      });
+
+      if (error) throw error;
+
+      const periodEnd = new Date((data as any).period_end);
+
+      // Log admin action
+      await supabase.from("admin_actions_log").insert({
+        admin_email: session.email,
+        action_type: "subscription_activated_manual",
+        restaurant_id: restaurant.id,
+        details: {
+          plan_name: plan.name,
+          billing_cycle: selectedBillingCycle,
+          months: subscriptionMonths,
+          period_end: periodEnd.toISOString(),
+        },
+      });
+
+      toast({
+        title: "Subscription Activated",
+        description: `${restaurant.name} now has ${plan.name} until ${periodEnd.toLocaleDateString()}`,
+      });
+
+      setSubscriptionDialog({ open: false, restaurant: null });
+      fetchRestaurants();
+    } catch (error: any) {
+      console.error("Error activating subscription:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to activate subscription",
+        variant: "destructive",
+      });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const deactivateSubscription = async () => {
+    const { restaurant } = subscriptionDialog;
+    if (!restaurant?.subscription || !session) return;
+
+    setSubscriptionLoading(true);
+    try {
+      // Use database function to bypass RLS
+      const { error } = await supabase.rpc("admin_cancel_subscription" as any, {
+        p_subscription_id: restaurant.subscription.id,
+      });
+
+      if (error) throw error;
+
+      // Log admin action
+      await supabase.from("admin_actions_log").insert({
+        admin_email: session.email,
+        action_type: "subscription_cancelled_manual",
+        restaurant_id: restaurant.id,
+        details: { previous_status: restaurant.subscription.status },
+      });
+
+      toast({
+        title: "Subscription Cancelled",
+        description: `${restaurant.name}'s subscription has been cancelled`,
+      });
+
+      setSubscriptionDialog({ open: false, restaurant: null });
+      fetchRestaurants();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel subscription",
+        variant: "destructive",
+      });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!session?.email) return;
+    
+    if (newPassword.length < 8) {
+      toast({ title: "Error", description: "Password must be at least 8 characters", variant: "destructive" });
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "New passwords don't match", variant: "destructive" });
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const result = await changeAdminPassword(session.email, currentPassword, newPassword);
+      if (result.success) {
+        toast({ title: "Password Changed", description: "Your password has been updated successfully" });
+        setPasswordDialog(false);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        toast({ title: "Error", description: result.error || "Failed to change password", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to change password", variant: "destructive" });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   const stats = {
     total: restaurants.length,
     active: restaurants.filter((r) => r.is_active).length,
     disabled: restaurants.filter((r) => !r.is_active).length,
+    subscribed: restaurants.filter((r) => r.subscription?.status === "active").length,
+    noSubscription: restaurants.filter((r) => !r.subscription || r.subscription.status !== "active").length,
   };
 
   return (
@@ -216,18 +429,33 @@ const AdminDashboardWithSidebar = () => {
               ))}
             </div>
           </div>
-          <div>
+          <div className="space-y-1 border-t border-neutral-200 dark:border-neutral-700 pt-4">
             <div
-              onClick={logout}
-              className="flex items-center justify-start gap-2 group/sidebar py-2 cursor-pointer"
+              onClick={() => setPasswordDialog(true)}
+              className="flex items-center justify-start gap-2 group/sidebar py-2 px-2 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-md transition-colors"
             >
-              <LogOut className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+              <Key className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
               <motion.span
                 animate={{
                   display: open ? "inline-block" : "none",
                   opacity: open ? 1 : 0,
                 }}
                 className="text-neutral-700 dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+              >
+                Change Password
+              </motion.span>
+            </div>
+            <div
+              onClick={logout}
+              className="flex items-center justify-start gap-2 group/sidebar py-2 px-2 cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors"
+            >
+              <LogOut className="text-red-600 dark:text-red-400 h-5 w-5 flex-shrink-0" />
+              <motion.span
+                animate={{
+                  display: open ? "inline-block" : "none",
+                  opacity: open ? 1 : 0,
+                }}
+                className="text-red-600 dark:text-red-400 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
               >
                 Logout
               </motion.span>
@@ -246,6 +474,7 @@ const AdminDashboardWithSidebar = () => {
         setStatusFilter={setStatusFilter}
         stats={stats}
         handleToggleStatus={handleToggleStatus}
+        handleManageSubscription={handleManageSubscription}
         session={session}
       />
 
@@ -276,6 +505,198 @@ const AdminDashboardWithSidebar = () => {
               onClick={confirmToggleStatus}
             >
               {confirmDialog.newStatus ? "Enable" : "Disable"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={passwordDialog} onOpenChange={(open) => {
+        if (!open) {
+          setPasswordDialog(false);
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Change Password
+            </DialogTitle>
+            <DialogDescription>
+              Update your admin password
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Password</label>
+              <div className="relative">
+                <Input
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Password</label>
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 8 chars)"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Confirm New Password</label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasswordDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleChangePassword} disabled={passwordLoading}>
+              {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Change Password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subscription Management Dialog */}
+      <Dialog open={subscriptionDialog.open} onOpenChange={(open) => !open && setSubscriptionDialog({ open: false, restaurant: null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Manage Subscription
+            </DialogTitle>
+            <DialogDescription>
+              {subscriptionDialog.restaurant?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {subscriptionDialog.restaurant?.subscription && (
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Current Plan:</span>
+                <span className="font-medium">{subscriptionDialog.restaurant.subscription.plan_name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant={subscriptionDialog.restaurant.subscription.status === "active" ? "default" : "destructive"}>
+                  {subscriptionDialog.restaurant.subscription.status}
+                </Badge>
+              </div>
+              {subscriptionDialog.restaurant.subscription.current_period_end && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Expires:</span>
+                  <span>{new Date(subscriptionDialog.restaurant.subscription.current_period_end).toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Plan</label>
+              <select
+                value={selectedPlan}
+                onChange={(e) => setSelectedPlan(e.target.value)}
+                className="w-full p-2 border rounded-md bg-background"
+              >
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name} - ₹{plan.price_monthly}/mo {plan.has_orders_feature ? "(Full Service)" : "(Menu Only)"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Billing Cycle</label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={selectedBillingCycle === "monthly" ? "default" : "outline"}
+                  onClick={() => setSelectedBillingCycle("monthly")}
+                  className="flex-1"
+                >
+                  Monthly
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedBillingCycle === "yearly" ? "default" : "outline"}
+                  onClick={() => setSelectedBillingCycle("yearly")}
+                  className="flex-1"
+                >
+                  Yearly
+                </Button>
+              </div>
+            </div>
+
+            {selectedBillingCycle === "monthly" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Duration (months)</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={subscriptionMonths}
+                  onChange={(e) => setSubscriptionMonths(parseInt(e.target.value) || 1)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {subscriptionDialog.restaurant?.subscription?.status === "active" && (
+              <Button
+                variant="destructive"
+                onClick={deactivateSubscription}
+                disabled={subscriptionLoading}
+                className="w-full sm:w-auto"
+              >
+                {subscriptionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+                Cancel Subscription
+              </Button>
+            )}
+            <Button
+              onClick={activateSubscription}
+              disabled={subscriptionLoading}
+              className="w-full sm:w-auto"
+            >
+              {subscriptionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              {subscriptionDialog.restaurant?.subscription ? "Update Subscription" : "Activate Subscription"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -321,6 +742,7 @@ const AdminContent = ({
   setStatusFilter, 
   stats, 
   handleToggleStatus,
+  handleManageSubscription,
   session 
 }: any) => {
   return (
@@ -335,18 +757,28 @@ const AdminContent = ({
         {activeTab === "restaurants" && (
           <div className="space-y-6">
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="p-6">
-                <div className="text-sm text-muted-foreground mb-1">Total Restaurants</div>
-                <div className="text-3xl font-bold">{stats.total}</div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <Card className="p-4 md:p-6">
+                <div className="text-xs md:text-sm text-muted-foreground mb-1">Total</div>
+                <div className="text-2xl md:text-3xl font-bold">{stats.total}</div>
               </Card>
-              <Card className="p-6">
-                <div className="text-sm text-muted-foreground mb-1">Active</div>
-                <div className="text-3xl font-bold text-green-600">{stats.active}</div>
+              <Card className="p-4 md:p-6">
+                <div className="text-xs md:text-sm text-muted-foreground mb-1">Active</div>
+                <div className="text-2xl md:text-3xl font-bold text-green-600">{stats.active}</div>
               </Card>
-              <Card className="p-6">
-                <div className="text-sm text-muted-foreground mb-1">Disabled</div>
-                <div className="text-3xl font-bold text-red-600">{stats.disabled}</div>
+              <Card className="p-4 md:p-6">
+                <div className="text-xs md:text-sm text-muted-foreground mb-1">Disabled</div>
+                <div className="text-2xl md:text-3xl font-bold text-red-600">{stats.disabled}</div>
+              </Card>
+              <Card className="p-4 md:p-6 bg-green-50 dark:bg-green-900/20">
+                <div className="text-xs md:text-sm text-muted-foreground mb-1 flex items-center gap-1">
+                  <Crown className="h-3 w-3" /> Subscribed
+                </div>
+                <div className="text-2xl md:text-3xl font-bold text-green-600">{stats.subscribed}</div>
+              </Card>
+              <Card className="p-4 md:p-6 bg-amber-50 dark:bg-amber-900/20">
+                <div className="text-xs md:text-sm text-muted-foreground mb-1">No Subscription</div>
+                <div className="text-2xl md:text-3xl font-bold text-amber-600">{stats.noSubscription}</div>
               </Card>
             </div>
 
@@ -386,14 +818,14 @@ const AdminContent = ({
             </Card>
 
             {/* Restaurant Table */}
-            <Card>
+            <Card className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Restaurant</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Registered</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Subscription</TableHead>
+                    <TableHead>Expires</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -412,59 +844,108 @@ const AdminContent = ({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    restaurants.map((restaurant: Restaurant) => (
-                      <TableRow key={restaurant.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            {restaurant.logo_url ? (
-                              <img
-                                src={restaurant.logo_url}
-                                alt={restaurant.name}
-                                className="w-10 h-10 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-lg">🍽️</span>
+                    restaurants.map((restaurant: Restaurant) => {
+                      const sub = restaurant.subscription;
+                      const isSubActive = sub?.status === "active";
+                      const isExpired = sub?.current_period_end && new Date(sub.current_period_end) < new Date();
+                      
+                      return (
+                        <TableRow key={restaurant.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              {restaurant.logo_url ? (
+                                <img
+                                  src={restaurant.logo_url}
+                                  alt={restaurant.name}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                  <span className="text-lg">🍽️</span>
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-medium">{restaurant.name}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {new Date(restaurant.created_at).toLocaleDateString()}
+                                </div>
                               </div>
-                            )}
-                            <span className="font-medium">{restaurant.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{restaurant.email}</TableCell>
-                        <TableCell>{restaurant.phone || "—"}</TableCell>
-                        <TableCell>
-                          {new Date(restaurant.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={restaurant.is_active ? "default" : "destructive"}
-                          >
-                            {restaurant.is_active ? (
-                              <>
-                                <Power className="h-3 w-3 mr-1" />
-                                Active
-                              </>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{restaurant.email}</div>
+                            <div className="text-xs text-muted-foreground">{restaurant.phone || "—"}</div>
+                          </TableCell>
+                          <TableCell>
+                            {sub ? (
+                              <div className="space-y-1">
+                                <Badge 
+                                  variant={isSubActive && !isExpired ? "default" : "secondary"}
+                                  className={isSubActive && !isExpired ? "bg-green-500" : isExpired ? "bg-red-500 text-white" : ""}
+                                >
+                                  {sub.has_orders_feature ? <Crown className="h-3 w-3 mr-1" /> : null}
+                                  {sub.plan_name}
+                                </Badge>
+                                <div className="text-xs text-muted-foreground capitalize">
+                                  {sub.billing_cycle} • {sub.status}
+                                </div>
+                              </div>
                             ) : (
-                              <>
-                                <PowerOff className="h-3 w-3 mr-1" />
-                                Disabled
-                              </>
+                              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                No Subscription
+                              </Badge>
                             )}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-sm text-muted-foreground">
-                              {restaurant.is_active ? "Disable" : "Enable"}
-                            </span>
-                            <Switch
-                              checked={restaurant.is_active}
-                              onCheckedChange={() => handleToggleStatus(restaurant)}
-                            />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          </TableCell>
+                          <TableCell>
+                            {sub?.current_period_end ? (
+                              <div className={`text-sm ${isExpired ? "text-red-500 font-medium" : ""}`}>
+                                <div className="flex items-center gap-1">
+                                  {isExpired ? <Clock className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
+                                  {new Date(sub.current_period_end).toLocaleDateString()}
+                                </div>
+                                {isExpired && <div className="text-xs">Expired</div>}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={restaurant.is_active ? "default" : "destructive"}
+                            >
+                              {restaurant.is_active ? (
+                                <>
+                                  <Power className="h-3 w-3 mr-1" />
+                                  Active
+                                </>
+                              ) : (
+                                <>
+                                  <PowerOff className="h-3 w-3 mr-1" />
+                                  Disabled
+                                </>
+                              )}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleManageSubscription(restaurant)}
+                              >
+                                <CreditCard className="h-4 w-4 mr-1" />
+                                Sub
+                              </Button>
+                              <Switch
+                                checked={restaurant.is_active}
+                                onCheckedChange={() => handleToggleStatus(restaurant)}
+                              />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

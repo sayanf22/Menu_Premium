@@ -17,7 +17,9 @@ import {
   Bell, 
   X,
   User,
-  FileText
+  FileText,
+  CreditCard,
+  AlertCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +32,9 @@ import StatsOverview from "@/components/dashboard/StatsOverview";
 import QRCodeDisplay from "@/components/dashboard/QRCodeDisplay";
 import SocialLinksForm from "@/components/dashboard/SocialLinksForm";
 import RestaurantProfile from "@/components/dashboard/RestaurantProfile";
+import SubscriptionManagement from "@/components/dashboard/SubscriptionManagement";
+import ServiceCallsPanel from "@/components/dashboard/ServiceCallsPanel";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface Order {
   id: string;
@@ -43,11 +48,23 @@ interface Order {
 const DashboardWithSidebar = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { subscription, hasOrdersFeature, loading: subscriptionLoading } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [restaurantName, setRestaurantName] = useState("");
   const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
   const [newOrdersCount, setNewOrdersCount] = useState(0);
+  const [serviceCallsCount, setServiceCallsCount] = useState(0);
+
+  // Redirect to menu-only dashboard if user doesn't have orders feature
+  useEffect(() => {
+    if (!subscriptionLoading && subscription && !hasOrdersFeature) {
+      navigate("/menu-dashboard");
+    }
+  }, [subscriptionLoading, subscription, hasOrdersFeature, navigate]);
+
+  // Check if subscription is expired
+  const isSubscriptionExpired = subscription && !subscription.is_active;
   const [newOrderNotification, setNewOrderNotification] = useState<Order | null>(null);
   const [lastNewOrder, setLastNewOrder] = useState<Order | null>(null);
   const [lastViewCount, setLastViewCount] = useState(0);
@@ -91,6 +108,16 @@ const DashboardWithSidebar = () => {
       badge: newOrdersCount,
     },
     {
+      label: "Service Calls",
+      href: "#service-calls",
+      icon: <Bell className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      onClick: () => {
+        handleTabChange("service-calls");
+        setServiceCallsCount(0);
+      },
+      badge: serviceCallsCount,
+    },
+    {
       label: "Feedback",
       href: "#feedback",
       icon: <MessageSquare className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
@@ -107,6 +134,12 @@ const DashboardWithSidebar = () => {
       href: "#qr",
       icon: <QrCode className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
       onClick: () => handleTabChange("qr"),
+    },
+    {
+      label: "Subscription",
+      href: "#subscription",
+      icon: <CreditCard className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      onClick: () => handleTabChange("subscription"),
     },
     {
       label: "Profile",
@@ -511,6 +544,24 @@ const DashboardWithSidebar = () => {
         "h-screen"
       )}
     >
+      {/* Subscription Expired Banner */}
+      {isSubscriptionExpired && (
+        <div className="fixed top-0 left-0 right-0 z-[200] bg-red-500 text-white py-3 px-4 text-center">
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <AlertCircle className="h-5 w-5" />
+            <span className="font-medium">Your subscription has expired!</span>
+            <Button 
+              size="sm" 
+              variant="secondary" 
+              onClick={() => setActiveTab("subscription")}
+              className="bg-white text-red-500 hover:bg-red-50"
+            >
+              Renew Now
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Global New Order Notification */}
       {newOrderNotification && (
         <Card className="fixed top-16 md:top-4 left-4 right-4 md:left-auto md:right-4 z-[100] md:w-96 shadow-2xl border-2 border-primary animate-in slide-in-from-top-4 duration-500">
@@ -668,6 +719,7 @@ const DashboardWithSidebar = () => {
         restaurantId={restaurantId} 
         onNewOrder={handleNewOrder}
         newOrderTrigger={lastNewOrder}
+        onNewServiceCall={() => setServiceCallsCount(prev => prev + 1)}
       />
     </div>
   );
@@ -710,12 +762,14 @@ const Dashboard = ({
   activeTab, 
   restaurantId, 
   onNewOrder,
-  newOrderTrigger
+  newOrderTrigger,
+  onNewServiceCall
 }: { 
   activeTab: string; 
   restaurantId: string;
   onNewOrder: (order: Order) => void;
   newOrderTrigger: Order | null;
+  onNewServiceCall: () => void;
 }) => {
   console.log('🎨 Dashboard render:', { activeTab, hasNewOrder: !!newOrderTrigger });
   return (
@@ -735,8 +789,10 @@ const Dashboard = ({
         </div>
         
         {activeTab === "feedback" && <FeedbackView restaurantId={restaurantId} />}
+        {activeTab === "service-calls" && <ServiceCallsPanel restaurantId={restaurantId} onNewCall={onNewServiceCall} />}
         {activeTab === "social" && <SocialLinksForm restaurantId={restaurantId} />}
         {activeTab === "qr" && <QRCodeDisplay restaurantId={restaurantId} />}
+        {activeTab === "subscription" && <SubscriptionManagement />}
         {activeTab === "profile" && <RestaurantProfile restaurantId={restaurantId} />}
       </div>
     </div>

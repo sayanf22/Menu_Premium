@@ -318,6 +318,109 @@ export type Database = {
           },
         ]
       }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          id: string
+          metadata: Json | null
+          payment_method: string | null
+          razorpay_payment_id: string | null
+          razorpay_signature: string | null
+          razorpay_subscription_id: string | null
+          status: string
+          subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_method?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          razorpay_subscription_id?: string | null
+          status: string
+          subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          payment_method?: string | null
+          razorpay_payment_id?: string | null
+          razorpay_signature?: string | null
+          razorpay_subscription_id?: string | null
+          status?: string
+          subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "user_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_registrations: {
+        Row: {
+          billing_cycle: string
+          created_at: string | null
+          email: string
+          expires_at: string
+          id: string
+          password_hash: string
+          plan_id: string
+          razorpay_subscription_id: string | null
+          restaurant_description: string | null
+          restaurant_name: string
+          status: string | null
+        }
+        Insert: {
+          billing_cycle: string
+          created_at?: string | null
+          email: string
+          expires_at?: string
+          id?: string
+          password_hash: string
+          plan_id: string
+          razorpay_subscription_id?: string | null
+          restaurant_description?: string | null
+          restaurant_name: string
+          status?: string | null
+        }
+        Update: {
+          billing_cycle?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          password_hash?: string
+          plan_id?: string
+          razorpay_subscription_id?: string | null
+          restaurant_description?: string | null
+          restaurant_name?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_registrations_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           count: number | null
@@ -339,6 +442,30 @@ export type Database = {
         }
         Relationships: []
       }
+      razorpay_webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          id: string
+          payload: Json
+          processed_at: string | null
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+        }
+        Relationships: []
+      }
       restaurants: {
         Row: {
           created_at: string
@@ -351,6 +478,7 @@ export type Database = {
           phone: string | null
           qr_code_url: string | null
           social_links: Json | null
+          subscription_plan_id: string | null
           updated_at: string
           user_id: string
         }
@@ -365,6 +493,7 @@ export type Database = {
           phone?: string | null
           qr_code_url?: string | null
           social_links?: Json | null
+          subscription_plan_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -379,10 +508,19 @@ export type Database = {
           phone?: string | null
           qr_code_url?: string | null
           social_links?: Json | null
+          subscription_plan_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "restaurants_subscription_plan_id_fkey"
+            columns: ["subscription_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_logs: {
         Row: {
@@ -417,50 +555,195 @@ export type Database = {
         }
         Relationships: []
       }
-      signup_codes: {
+      service_calls: {
         Row: {
-          code: string
+          acknowledged_at: string | null
+          call_type: string
+          completed_at: string | null
           created_at: string | null
-          current_uses: number | null
-          description: string | null
-          expires_at: string | null
           id: string
-          is_used: boolean | null
-          max_uses: number | null
-          used_at: string | null
-          used_by: string | null
+          restaurant_id: string
+          status: string
+          table_number: string
         }
         Insert: {
-          code: string
+          acknowledged_at?: string | null
+          call_type: string
+          completed_at?: string | null
           created_at?: string | null
-          current_uses?: number | null
-          description?: string | null
-          expires_at?: string | null
           id?: string
-          is_used?: boolean | null
-          max_uses?: number | null
-          used_at?: string | null
-          used_by?: string | null
+          restaurant_id: string
+          status?: string
+          table_number: string
         }
         Update: {
-          code?: string
+          acknowledged_at?: string | null
+          call_type?: string
+          completed_at?: string | null
           created_at?: string | null
-          current_uses?: number | null
-          description?: string | null
-          expires_at?: string | null
           id?: string
-          is_used?: boolean | null
-          max_uses?: number | null
-          used_at?: string | null
-          used_by?: string | null
+          restaurant_id?: string
+          status?: string
+          table_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_calls_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          features: Json | null
+          has_orders_feature: boolean | null
+          id: string
+          is_active: boolean | null
+          max_categories: number | null
+          max_menu_items: number | null
+          name: string
+          price_monthly: number
+          price_yearly: number
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          has_orders_feature?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          max_categories?: number | null
+          max_menu_items?: number | null
+          name: string
+          price_monthly: number
+          price_yearly: number
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          features?: Json | null
+          has_orders_feature?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          max_categories?: number | null
+          max_menu_items?: number | null
+          name?: string
+          price_monthly?: number
+          price_yearly?: number
+          slug?: string
+          updated_at?: string | null
         }
         Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          billing_cycle: string
+          cancelled_at: string | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          pending_billing_cycle: string | null
+          pending_plan_id: string | null
+          pending_razorpay_subscription_id: string | null
+          plan_id: string
+          razorpay_customer_id: string | null
+          razorpay_subscription_id: string | null
+          restaurant_id: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          billing_cycle: string
+          cancelled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          pending_billing_cycle?: string | null
+          pending_plan_id?: string | null
+          pending_razorpay_subscription_id?: string | null
+          plan_id: string
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          restaurant_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          billing_cycle?: string
+          cancelled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          pending_billing_cycle?: string | null
+          pending_plan_id?: string | null
+          pending_razorpay_subscription_id?: string | null
+          plan_id?: string
+          razorpay_customer_id?: string | null
+          razorpay_subscription_id?: string | null
+          restaurant_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_pending_plan_id_fkey"
+            columns: ["pending_plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_subscriptions_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_feedback_rate_limit: {
+        Args: { p_max_feedback_per_order?: number; p_order_id: string }
+        Returns: boolean
+      }
+      check_order_rate_limit: {
+        Args: {
+          p_max_orders_per_hour?: number
+          p_restaurant_id: string
+          p_table_number: string
+        }
+        Returns: boolean
+      }
+      check_orders_feature_access: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       check_rate_limit: {
         Args: {
           p_key: string
@@ -507,6 +790,18 @@ export type Database = {
         Returns: Json
       }
       end_menu_session: { Args: { p_session_id: string }; Returns: boolean }
+      get_user_subscription_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          current_period_end: string
+          has_orders_feature: boolean
+          has_subscription: boolean
+          is_active: boolean
+          plan_name: string
+          plan_slug: string
+          subscription_status: string
+        }[]
+      }
       is_client_blocked: {
         Args: {
           p_ip_hash: string

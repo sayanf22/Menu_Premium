@@ -12,13 +12,14 @@ import {
   ShoppingCart, Plus, Minus, X, Search, Moon, Sun, Clock, 
   CheckCircle2, ArrowRight, Utensils, Sparkles, Salad, UtensilsCrossed, 
   Coffee, IceCream, Wine, Soup, Pizza, Sandwich, Flame, Leaf, Fish, Beef, Cookie,
-  Instagram, Facebook, Twitter, Globe
+  Instagram, Facebook, Twitter, Globe, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { isRateLimited, RATE_LIMITS, isValidUUID, isValidTableNumber, sanitizeInput, getClientFingerprint } from "@/lib/security";
+import ServiceCallButton from "@/components/ServiceCallButton";
 
 // Animation configs
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
@@ -223,6 +224,9 @@ const CustomerMenu = () => {
   const formatINR = useCallback((value: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0)), []);
 
+  // Subscription expired state
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+
   // Queries
   const { data: restaurant } = useQuery({
     queryKey: ['restaurant', restaurantId],
@@ -235,6 +239,16 @@ const CustomerMenu = () => {
       if (data && !data.is_active) {
         setServiceDisabled(true);
         setRestaurantContact({ name: data.name, email: data.email, phone: data.phone });
+      }
+      // Check subscription status using database function
+      if (restaurantId) {
+        const { data: subStatus } = await supabase
+          .rpc("get_restaurant_subscription_status" as any, { p_restaurant_id: restaurantId });
+        const statusArray = subStatus as any[];
+        if (statusArray && statusArray.length > 0 && !statusArray[0].is_subscription_active) {
+          setSubscriptionExpired(true);
+          setRestaurantContact({ name: data.name, email: data.email, phone: data.phone });
+        }
       }
       return data;
     },
@@ -567,6 +581,38 @@ const CustomerMenu = () => {
             </div>
             <h1 className="text-2xl font-bold mb-2">Service Unavailable</h1>
             <p className="text-zinc-500 dark:text-zinc-400">{restaurantContact.name}'s menu is currently unavailable.</p>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Subscription Expired - Show contact restaurant message
+  if (subscriptionExpired && restaurantContact) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-100 dark:bg-black p-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={springConfig}>
+          <Card className="max-w-md w-full p-8 text-center border-0 shadow-2xl rounded-3xl bg-white dark:bg-zinc-900">
+            <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="h-10 w-10 text-amber-500" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-white">Menu Temporarily Unavailable</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 mb-4">
+              {restaurantContact.name}'s digital menu service is currently inactive.
+            </p>
+            <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-xl space-y-2">
+              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Please contact the restaurant:</p>
+              {restaurantContact.email && (
+                <a href={`mailto:${restaurantContact.email}`} className="block text-sm text-orange-500 hover:underline">
+                  📧 {restaurantContact.email}
+                </a>
+              )}
+              {restaurantContact.phone && (
+                <a href={`tel:${restaurantContact.phone}`} className="block text-sm text-orange-500 hover:underline">
+                  📞 {restaurantContact.phone}
+                </a>
+              )}
+            </div>
           </Card>
         </motion.div>
       </div>
@@ -916,16 +962,15 @@ const CustomerMenu = () => {
             {/* Powered By AddMenu */}
             <div className="text-center pb-4">
               <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                Powered by{' '}
-                <span className="font-semibold text-zinc-600 dark:text-zinc-400">
-                  AddMenu
-                </span>
+                Powered by <span className="font-semibold text-orange-500">AddMenu</span>
               </p>
             </div>
           </footer>
         )}
       </main>
 
+      {/* Service Call Button - Waiter/Water/Bill */}
+      <ServiceCallButton restaurantId={restaurantId || ""} tableNumber={tableNumber} />
 
       {/* Floating Cart Button */}
       <AnimatePresence>
@@ -1251,50 +1296,75 @@ const CustomerMenu = () => {
   );
 };
 
-// Menu Item Card Component with smooth slide-in animation
+// Menu Item Card Component with smooth slide-in animation and expandable description
 const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageLoaded, setImageLoaded }: any) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasLongDescription = item.description && item.description.length > 60;
+
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: index % 2 === 0 ? -30 : 30, y: 20 }}
-      whileInView={{ opacity: 1, x: 0, y: 0 }}
+      initial={{ opacity: 0, y: 30, scale: 0.95 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ 
         type: "spring" as const, 
         stiffness: 300, 
         damping: 25, 
-        delay: (index % 4) * 0.08 
+        delay: (index % 4) * 0.05 
       }}
-      whileHover={{ y: -6, scale: 1.02 }}
+      whileHover={{ y: -8, scale: 1.02 }}
+      className="group"
     >
-      <Card className="overflow-hidden border-0 shadow-lg bg-white dark:bg-zinc-900 rounded-3xl hover:shadow-xl transition-all duration-300">
+      <Card className="overflow-hidden border-0 shadow-lg hover:shadow-2xl bg-white dark:bg-zinc-900 rounded-3xl transition-all duration-300">
         <div className="flex p-4 gap-4">
-          <div className="relative w-28 h-28 flex-shrink-0">
+          {/* Image */}
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex-shrink-0">
             <div className={`absolute inset-0 bg-zinc-200 dark:bg-zinc-800 rounded-2xl animate-pulse ${imageLoaded[item.id] ? 'hidden' : ''}`} />
-            <img
+            <motion.img
               src={item.image_url || '/placeholder.svg'}
               alt={item.name}
               onLoad={() => setImageLoaded((prev: any) => ({ ...prev, [item.id]: true }))}
-              className={`w-full h-full object-cover rounded-2xl transition-opacity duration-300 ${imageLoaded[item.id] ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-full object-cover rounded-2xl transition-all duration-300 ${imageLoaded[item.id] ? 'opacity-100' : 'opacity-0'}`}
               loading="lazy"
+              whileHover={{ scale: 1.05 }}
             />
             {!item.is_available && (
-              <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center">
-                <span className="text-white text-xs font-semibold px-2 py-1 bg-red-500 rounded-lg">Unavailable</span>
+              <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <span className="text-white text-xs font-bold px-3 py-1.5 bg-red-500 rounded-xl shadow-lg">Unavailable</span>
               </div>
             )}
           </div>
 
+          {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
             <div>
-              <h3 className="font-bold text-zinc-900 dark:text-white text-base leading-tight line-clamp-2">{item.name}</h3>
+              <h3 className="font-bold text-zinc-900 dark:text-white text-base sm:text-lg leading-tight">{item.name}</h3>
               {item.description && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">{item.description}</p>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={isExpanded ? 'expanded' : 'collapsed'}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className={`text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed ${!isExpanded && hasLongDescription ? 'line-clamp-2' : ''}`}
+                  >
+                    {item.description}
+                  </motion.p>
+                </AnimatePresence>
+              )}
+              {hasLongDescription && (
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="text-xs font-medium text-orange-500 hover:text-orange-600 mt-1 flex items-center gap-0.5"
+                >
+                  {isExpanded ? 'Less' : 'More'}
+                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
               )}
             </div>
             
             <div className="flex items-center justify-between mt-3">
-              <span className="text-xl font-bold text-zinc-900 dark:text-white">{formatINR(item.price)}</span>
+              <span className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">{formatINR(item.price)}</span>
               
               {item.is_available && (
                 <AnimatePresence mode="wait">
@@ -1304,13 +1374,13 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.8, opacity: 0 }}
-                      className="flex items-center bg-gradient-to-r from-red-500 to-orange-500 rounded-xl overflow-hidden shadow-lg"
+                      className="flex items-center bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl overflow-hidden shadow-xl"
                     >
-                      <button onClick={() => onUpdate(item.id, -1)} className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10">
+                      <button onClick={() => onUpdate(item.id, -1)} className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 transition-colors">
                         <Minus className="w-4 h-4" />
                       </button>
                       <span className="w-8 text-center text-white font-bold">{cartQty}</span>
-                      <button onClick={() => onAdd(item)} className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10">
+                      <button onClick={() => onAdd(item)} className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 transition-colors">
                         <Plus className="w-4 h-4" />
                       </button>
                     </motion.div>
@@ -1320,10 +1390,10 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                       initial={{ scale: 0.8, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       exit={{ scale: 0.8, opacity: 0 }}
-                      whileHover={{ scale: 1.05 }}
+                      whileHover={{ scale: 1.08 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => onAdd(item)}
-                      className="px-5 py-2.5 bg-white dark:bg-zinc-800 border-2 border-red-500 text-red-500 rounded-xl font-bold text-sm hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                      className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-sm shadow-lg hover:shadow-xl transition-all"
                     >
                       ADD
                     </motion.button>

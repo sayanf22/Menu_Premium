@@ -1,22 +1,22 @@
 {
-  "name": "Quick Menu Dish",
-  "short_name": "QuickMenu",
-  "description": "Digital menu ordering system",
+  "name": "AddMenu",
+  "short_name": "AddMenu",
+  "description": "Digital menu and ordering system for restaurants",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#f97316",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/favicon.jpg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/favicon.jpg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ]

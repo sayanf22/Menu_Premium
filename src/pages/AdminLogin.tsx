@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Lock, Mail, Shield } from "lucide-react";
-import { isRateLimited, getRemainingAttempts, clearRateLimit, RATE_LIMITS, getClientFingerprint } from "@/lib/security";
+import { isRateLimited, getRemainingAttempts, clearRateLimit, getClientFingerprint } from "@/lib/security";
 
 const AdminLogin = () => {
     const [email, setEmail] = useState("");
@@ -18,7 +18,6 @@ const AdminLogin = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Redirect if already authenticated
         if (isAuthenticated) {
             navigate("/admindashboard");
         }
@@ -27,9 +26,8 @@ const AdminLogin = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Rate limiting for admin login (stricter)
         const rateLimitKey = `admin_auth_${getClientFingerprint()}`;
-        const adminRateLimit = { maxRequests: 3, windowMs: 5 * 60 * 1000 }; // 3 attempts per 5 minutes
+        const adminRateLimit = { maxRequests: 3, windowMs: 5 * 60 * 1000 };
         
         if (isRateLimited(rateLimitKey, adminRateLimit)) {
             const remaining = getRemainingAttempts(rateLimitKey, adminRateLimit);

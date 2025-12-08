@@ -4,17 +4,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { QrCode, Eye, EyeOff, FileText, Shield, RefreshCw, Truck, Phone, IndianRupee, Info, ExternalLink } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Eye, EyeOff, Loader2, ArrowLeft, ArrowRight, Check, Lock, Star, CreditCard
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import { isRateLimited, getRemainingAttempts, clearRateLimit, RATE_LIMITS, getClientFingerprint } from "@/lib/security";
+import { isRateLimited, RATE_LIMITS, getClientFingerprint, isBlocked, sanitizeInput } from "@/lib/security";
+import { useSubscription } from "@/hooks/useSubscription";
+import { 
+  createRegistrationSubscription, 
+  verifyRegistrationPayment, 
+  openRazorpayCheckout
+} from "@/lib/razorpay";
 
 const authSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string()
-    .min(8, "Password must be at least 8 characters"),
+  email: z.string().email("Please enter a valid email address").max(254, "Email too long"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128, "Password too long"),
   name: z.string().min(2, "Restaurant name must be at least 2 characters").max(100, "Restaurant name too long").optional(),
 });
 
@@ -22,263 +29,327 @@ const Auth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { plans } = useSubscription();
+  
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
+  const [activeTab, setActiveTab] = useState<"signin" | "signup">(searchParams.get("mode") === "signup" ? "signup" : "signin");
+  const [signUpStep, setSignUpStep] = useState<"form" | "plan">("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
+  const [restaurantDescription, setRestaurantDescription] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [isYearly, setIsYearly] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     checkUser();
   }, []);
 
+  useEffect(() => {
+    if (plans.length > 0 && !selectedPlanId) {
+      setSelectedPlanId(plans[0].id);
+    }
+  }, [plans]);
+
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      navigate("/dashboard");
-    }
+    if (session) navigate("/dashboard");
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Rate limiting for password reset
-    const rateLimitKey = `password_reset_${getClientFingerprint()}`;
-    if (isRateLimited(rateLimitKey, RATE_LIMITS.passwordReset)) {
-      const remaining = getRemainingAttempts(rateLimitKey, RATE_LIMITS.passwordReset);
-      toast({
-        title: "Too many attempts",
-        description: `Please wait before trying again. ${remaining} attempts remaining.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setLoading(true);
-
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-
       if (error) throw error;
-
       setResetEmailSent(true);
-      toast({
-        title: "Email Sent!",
-        description: "Check your email for the password reset link",
-      });
+      toast({ title: "Email Sent!", description: "Check your email for the reset link" });
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send reset email",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Rate limiting for auth attempts
     const rateLimitKey = `auth_${getClientFingerprint()}`;
-    if (isRateLimited(rateLimitKey, RATE_LIMITS.auth)) {
-      const remaining = getRemainingAttempts(rateLimitKey, RATE_LIMITS.auth);
-      toast({
-        title: "Too many attempts",
-        description: `Please wait before trying again. ${remaining} attempts remaining.`,
-        variant: "destructive",
-      });
+    const blockStatus = isBlocked(rateLimitKey);
+    if (blockStatus.blocked) {
+      toast({ title: "Too many attempts", description: `Please wait ${Math.ceil(blockStatus.remainingMs / 60000)} minute(s)`, variant: "destructive" });
       return;
     }
-    
+    if (isRateLimited(rateLimitKey, RATE_LIMITS.auth)) {
+      toast({ title: "Too many attempts", description: "Please wait a few minutes", variant: "destructive" });
+      return;
+    }
     setLoading(true);
-
     try {
-      const validationData = isSignUp 
-        ? { email, password, name: restaurantName }
-        : { email, password };
-      
-      authSchema.parse(validationData);
-
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: {
-              name: restaurantName,
-            }
-          }
-        });
-
-        if (error) throw error;
-
-        if (data.user) {
-          toast({
-            title: "Account created!",
-            description: "Welcome to AddMenu. Setting up your dashboard...",
-          });
-          navigate("/dashboard");
-        }
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        if (data.user) {
-          // Clear rate limit on successful login
-          clearRateLimit(rateLimitKey);
-          toast({
-            title: "Welcome back!",
-            description: "Signed in successfully",
-          });
-          navigate("/dashboard");
-        }
+      // Only validate email format for sign-in, let Supabase handle password
+      if (!email.trim()) {
+        throw new Error("Please enter your email");
+      }
+      if (!password) {
+        throw new Error("Please enter your password");
+      }
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      if (error) throw error;
+      if (data.user) {
+        toast({ title: "Welcome back!", description: "Signed in successfully" });
+        navigate("/dashboard");
       }
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast({
-          title: "Validation Error",
-          description: error.errors[0].message,
-          variant: "destructive",
-        });
-      } else if (error.message?.includes("already registered")) {
-        toast({
-          title: "Account exists",
-          description: "This email is already registered. Please sign in instead.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: error.message || "An error occurred during authentication",
-          variant: "destructive",
-        });
-      }
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const menuItems = [
-    { to: "/terms", icon: FileText, label: "Terms & Conditions" },
-    { to: "/privacy-policy", icon: Shield, label: "Privacy Policy" },
-    { to: "/refund-policy", icon: RefreshCw, label: "Refund Policy" },
-    { to: "/shipping-policy", icon: Truck, label: "Shipping Policy" },
-    { to: "/contact", icon: Phone, label: "Contact Us" },
-    { to: "/pricing", icon: IndianRupee, label: "Pricing" },
-    { to: "/about", icon: Info, label: "About Us" },
-  ];
+  const handleSignUpFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      authSchema.parse({ email, password, name: restaurantName });
+      setSignUpStep("plan");
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        toast({ title: "Validation Error", description: error.errors[0].message, variant: "destructive" });
+      }
+    }
+  };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4 relative">
-      {/* Modern Minimal Menu Button */}
-      <div className="absolute top-4 right-4 z-50">
-        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetTrigger asChild>
+  const handleRegisterAndPay = async (planId: string) => {
+    const rateLimitKey = `registration_${getClientFingerprint()}`;
+    const blockStatus = isBlocked(rateLimitKey);
+    if (blockStatus.blocked) {
+      toast({ title: "Too many attempts", description: `Please wait ${Math.ceil(blockStatus.remainingMs / 60000)} minute(s)`, variant: "destructive" });
+      return;
+    }
+    if (isRateLimited(rateLimitKey, { maxRequests: 3, windowMs: 600000, blockDurationMs: 1800000 })) {
+      toast({ title: "Too many attempts", description: "Please wait before trying again", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    setSelectedPlanId(planId);
+    try {
+      const billingCycle = isYearly ? "yearly" : "monthly";
+      const { subscriptionId, planName, razorpayKeyId, error } = await createRegistrationSubscription({
+        email: email.trim().toLowerCase(),
+        password,
+        restaurantName: sanitizeInput(restaurantName),
+        restaurantDescription: sanitizeInput(restaurantDescription),
+        planId,
+        billingCycle,
+      });
+      if (error || !subscriptionId) throw new Error(error || "Failed to create subscription");
+      if (!razorpayKeyId) throw new Error("Payment gateway not configured");
+
+      await openRazorpayCheckout({
+        key: razorpayKeyId,
+        subscription_id: subscriptionId,
+        name: "AddMenu",
+        description: `${planName} - ${billingCycle} subscription`,
+        prefill: { email, name: restaurantName },
+        theme: { color: "#f97316" },
+        handler: async (response) => {
+          setLoading(true);
+          try {
+            const result = await verifyRegistrationPayment(
+              response.razorpay_payment_id,
+              response.razorpay_subscription_id,
+              response.razorpay_signature
+            );
+            if (!result.success) throw new Error(result.error || "Payment verification failed");
+            toast({ title: "🎉 Account Created!", description: "Signing you in..." });
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+            if (signInError) {
+              toast({ title: "Account created", description: "Please sign in" });
+              setActiveTab("signin");
+              setSignUpStep("form");
+              return;
+            }
+            navigate(result.hasOrdersFeature ? "/dashboard" : "/menu-dashboard");
+          } catch (err: any) {
+            toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+          } finally {
+            setLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setLoading(false);
+            toast({ title: "Payment cancelled", description: "You can try again within 30 minutes" });
+          },
+        },
+      });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setLoading(false);
+    }
+  };
+
+  const formatPrice = (price: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(price);
+
+  // Logo component
+  const Logo = () => (
+    <div className="w-16 h-16 bg-orange-500 rounded-xl flex items-center justify-center mx-auto mb-4">
+      <svg viewBox="0 0 24 24" className="w-10 h-10 text-white" fill="currentColor">
+        <path d="M3 3h18v2H3V3zm0 4h12v2H3V7zm0 4h18v2H3v-2zm0 4h12v2H3v-2zm0 4h18v2H3v-2z" />
+      </svg>
+    </div>
+  );
+
+  // Plan selection screen
+  if (signUpStep === "plan") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-50/30 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur">
+          <CardContent className="p-8">
+            <Logo />
+            <h1 className="text-2xl font-bold text-center text-gray-900">AddMenu</h1>
+            <p className="text-gray-500 text-center mt-1 mb-6">Select a plan to continue</p>
+
             <button 
-              className="group relative w-10 h-10 flex items-center justify-center rounded-xl bg-background/80 backdrop-blur-sm border border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all duration-300 shadow-sm"
-              aria-label="Open menu"
+              onClick={() => setSignUpStep("form")} 
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
             >
-              <div className="flex flex-col gap-1.5">
-                <span className={`block h-0.5 bg-foreground/70 group-hover:bg-primary transition-all duration-300 ${menuOpen ? 'w-4 rotate-45 translate-y-2' : 'w-5'}`} />
-                <span className={`block h-0.5 bg-foreground/70 group-hover:bg-primary transition-all duration-300 ${menuOpen ? 'opacity-0' : 'w-3.5 ml-auto'}`} />
-                <span className={`block h-0.5 bg-foreground/70 group-hover:bg-primary transition-all duration-300 ${menuOpen ? 'w-4 -rotate-45 -translate-y-2' : 'w-4'}`} />
-              </div>
+              <ArrowLeft className="h-4 w-4" /> Back
             </button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[300px] sm:w-[340px] border-l border-border/50 bg-background/95 backdrop-blur-xl">
-            <SheetHeader className="pb-6 border-b border-border/50">
-              <SheetTitle className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <QrCode className="h-5 w-5 text-primary" />
-                </div>
-                <span className="text-lg font-semibold">AddMenu</span>
-              </SheetTitle>
-            </SheetHeader>
-            
-            <nav className="mt-6 flex flex-col gap-1">
-              {menuItems.map((item, index) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setMenuOpen(false)}
-                  className="group flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="p-2 rounded-lg bg-muted/50 group-hover:bg-primary/10 transition-colors">
-                    <item.icon className="h-4 w-4 group-hover:text-primary transition-colors" />
+
+            {/* Account info */}
+            <div className="bg-gray-50 rounded-full px-4 py-3 text-center mb-6">
+              <span className="text-gray-500">Account: </span>
+              <span className="font-medium text-gray-900">{email}</span>
+            </div>
+
+            {/* Billing toggle */}
+            <div className="flex items-center justify-center gap-1 mb-6">
+              <button
+                onClick={() => setIsYearly(false)}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  !isYearly ? "bg-orange-500 text-white" : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setIsYearly(true)}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                  isYearly ? "bg-orange-500 text-white" : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Yearly
+                <Badge className="bg-orange-100 text-orange-600 hover:bg-orange-100 text-xs">-17%</Badge>
+              </button>
+            </div>
+
+            {/* Plans */}
+            <div className="space-y-4">
+              {plans.map((plan) => {
+                const price = isYearly ? plan.price_yearly : plan.price_monthly;
+                const isPopular = plan.has_orders_feature;
+                
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative border-2 rounded-2xl p-5 transition-all ${
+                      isPopular ? "border-orange-500 bg-orange-50/50" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {isPopular && (
+                      <Badge className="absolute -top-3 right-4 bg-orange-500 text-white hover:bg-orange-500">
+                        Best Value
+                      </Badge>
+                    )}
+                    
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          isPopular ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {isPopular ? <Star className="h-5 w-5" /> : <Check className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{plan.name}</h3>
+                          <p className="text-sm text-gray-500">{plan.description}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold text-gray-900">{formatPrice(price)}</span>
+                        <span className="text-gray-500 text-sm">/mo</span>
+                      </div>
+                    </div>
+
+                    {/* Features grid */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      {plan.features.slice(0, 4).map((feature, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm text-gray-600">
+                          <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                          <span className="truncate">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      onClick={() => handleRegisterAndPay(plan.id)}
+                      disabled={loading && selectedPlanId === plan.id}
+                      className={`w-full rounded-full h-11 ${
+                        isPopular 
+                          ? "bg-orange-500 hover:bg-orange-600 text-white" 
+                          : "bg-white border-2 border-orange-500 text-orange-500 hover:bg-orange-50"
+                      }`}
+                    >
+                      {loading && selectedPlanId === plan.id ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
+                      ) : (
+                        <><CreditCard className="h-4 w-4 mr-2" /> Pay & Create Account</>
+                      )}
+                    </Button>
                   </div>
-                  <span className="font-medium text-sm">{item.label}</span>
-                  <ExternalLink className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-50 transition-opacity" />
-                </Link>
-              ))}
-            </nav>
-
-            {/* Footer */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-border/50 bg-muted/30">
-              <div className="text-center space-y-2">
-                <p className="text-xs font-medium text-foreground/80">© 2025 AddMenu</p>
-                <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-                  <a href="mailto:support@addmenu.in" className="hover:text-primary transition-colors">
-                    support@addmenu.in
-                  </a>
-                </div>
-                <a href="tel:+917005832798" className="text-xs text-muted-foreground hover:text-primary transition-colors">
-                  +91 700-583-2798
-                </a>
-              </div>
+                );
+              })}
             </div>
-          </SheetContent>
-        </Sheet>
+
+            {/* Security note */}
+            <div className="flex items-center justify-center gap-2 mt-6 text-sm text-gray-500">
+              <Lock className="h-4 w-4" />
+              <span>Secure payment via Razorpay • 7-day refund guarantee</span>
+            </div>
+
+            <Link to="/" className="block text-center mt-4 text-gray-500 hover:text-orange-500 text-sm">
+              ← Back to Home
+            </Link>
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
 
-      <Card className="w-full max-w-md shadow-[var(--shadow-medium)] animate-scale-in">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-primary/10">
-              <QrCode className="h-10 w-10 text-primary" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl font-bold">
-            {showForgotPassword ? "Reset Password" : isSignUp ? "Create Your Account" : "Welcome Back"}
-          </CardTitle>
-          <CardDescription>
-            {showForgotPassword 
-              ? "Enter your email to receive a password reset link"
-              : isSignUp 
-                ? "Start managing your restaurant menu in minutes" 
-                : "Sign in to access your dashboard"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {showForgotPassword ? (
-            resetEmailSent ? (
-              <div className="text-center space-y-4">
-                <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                  <p className="text-sm text-green-800 dark:text-green-200">
-                    ✓ Password reset email sent! Check your inbox.
-                  </p>
+  // Forgot password screen
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-50/30 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur">
+          <CardContent className="p-8">
+            <Logo />
+            <h1 className="text-2xl font-bold text-center text-gray-900">AddMenu</h1>
+            <p className="text-gray-500 text-center mt-1 mb-6">Reset your password</p>
+
+            {resetEmailSent ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 rounded-xl text-center">
+                  <Check className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <p className="text-green-800 font-medium">Reset email sent!</p>
+                  <p className="text-green-600 text-sm">Check your inbox for the reset link</p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setShowForgotPassword(false);
-                    setResetEmailSent(false);
-                  }}
-                  className="w-full"
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setShowForgotPassword(false); setResetEmailSent(false); }} 
+                  className="w-full rounded-full h-11"
                 >
                   Back to Sign In
                 </Button>
@@ -286,135 +357,190 @@ const Auth = () => {
             ) : (
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
-                  <Input
-                    id="reset-email"
-                    type="email"
+                  <Label className="text-gray-700 font-medium">Email</Label>
+                  <Input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
                     placeholder="you@restaurant.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                    required 
                   />
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full" 
-                  variant="hero" 
-                  size="lg"
                   disabled={loading}
+                  className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full h-11"
                 >
                   {loading ? "Sending..." : "Send Reset Link"}
                 </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setShowForgotPassword(false)}
-                  className="w-full"
+                <button 
+                  type="button" 
+                  onClick={() => setShowForgotPassword(false)} 
+                  className="w-full text-center text-gray-500 hover:text-orange-500 text-sm"
                 >
-                  Back to Sign In
-                </Button>
-              </form>
-            )
-          ) : (
-            <form onSubmit={handleAuth} className="space-y-4">
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Restaurant Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Your Restaurant"
-                  value={restaurantName}
-                  onChange={(e) => setRestaurantName(e.target.value)}
-                  required={isSignUp}
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@restaurant.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  ← Back to Sign In
                 </button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main auth screen (Sign In / Sign Up)
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-orange-50/50 via-white to-orange-50/30 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur">
+        <CardContent className="p-8">
+          <Logo />
+          <h1 className="text-2xl font-bold text-center text-gray-900">AddMenu</h1>
+          <p className="text-gray-500 text-center mt-1 mb-6">Create your digital menu</p>
+
+          {/* Tabs */}
+          <div className="flex bg-gray-100 rounded-full p-1 mb-6">
+            <button
+              onClick={() => setActiveTab("signin")}
+              className={`flex-1 py-2.5 rounded-full text-sm font-medium transition-all ${
+                activeTab === "signin" 
+                  ? "bg-white text-gray-900 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => setActiveTab("signup")}
+              className={`flex-1 py-2.5 rounded-full text-sm font-medium transition-all ${
+                activeTab === "signup" 
+                  ? "bg-white text-gray-900 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          {activeTab === "signup" ? (
+            <form onSubmit={handleSignUpFormSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-gray-700 font-medium">Restaurant Name *</Label>
+                <Input 
+                  value={restaurantName} 
+                  onChange={(e) => setRestaurantName(e.target.value)} 
+                  placeholder="Your Restaurant"
+                  className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  required 
+                />
               </div>
-              {!isSignUp && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPassword(true)}
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
+              <div className="space-y-2">
+                <Label className="text-gray-700 font-medium">Description</Label>
+                <Input 
+                  value={restaurantDescription} 
+                  onChange={(e) => setRestaurantDescription(e.target.value)} 
+                  placeholder="Fine dining experience... (optional)"
+                  className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-700 font-medium">Email *</Label>
+                <Input 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  placeholder="you@restaurant.com"
+                  className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-gray-700 font-medium">Password *</Label>
+                <div className="relative">
+                  <Input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    placeholder="Min 8 characters"
+                    className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500 pr-12"
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full h-12 text-base font-medium"
+              >
+                Continue to Payment <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+              <p className="text-center text-sm text-gray-500">
+                By signing up, you agree to our{" "}
+                <Link to="/terms" className="text-orange-500 hover:underline">Terms</Link>
+                {" "}and{" "}
+                <Link to="/privacy-policy" className="text-orange-500 hover:underline">Privacy Policy</Link>
+              </p>
+            </form>
+          ) : (
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-gray-700 font-medium">Email</Label>
+                <Input 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  placeholder="you@restaurant.com"
+                  className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500"
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-gray-700 font-medium">Password</Label>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowForgotPassword(true)} 
+                    className="text-sm text-orange-500 hover:text-orange-600 font-medium"
                   >
                     Forgot password?
                   </button>
                 </div>
-              )}
-            </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              variant="hero" 
-              size="lg"
-              disabled={loading}
-            >
-              {loading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
-            </Button>
-          </form>
-          )}
-          
-          {!showForgotPassword && (
-            <div className="mt-6 text-center text-sm">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-primary hover:underline"
+                <div className="relative">
+                  <Input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="h-12 rounded-xl border-gray-200 focus:border-orange-500 focus:ring-orange-500 pr-12"
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)} 
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full h-12 text-base font-medium"
               >
-                {isSignUp 
-                  ? "Already have an account? Sign in" 
-                  : "Don't have an account? Sign up"}
-              </button>
-            </div>
+                {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</> : "Sign In"}
+              </Button>
+            </form>
           )}
 
-          {/* Policy Links Footer */}
-          <div className="mt-6 pt-4 border-t">
-            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <Link to="/terms" className="hover:text-primary transition-colors">Terms</Link>
-              <span>•</span>
-              <Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy</Link>
-              <span>•</span>
-              <Link to="/refund-policy" className="hover:text-primary transition-colors">Refunds</Link>
-              <span>•</span>
-              <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
-            </div>
-          </div>
+          <Link to="/" className="block text-center mt-6 text-gray-500 hover:text-orange-500 text-sm">
+            ← Back to Home
+          </Link>
         </CardContent>
       </Card>
     </div>
