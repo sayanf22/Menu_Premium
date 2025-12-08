@@ -29,7 +29,7 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
     water: false,
     bill: false,
   });
-  const [pendingCalls, setPendingCalls] = useState<any[]>([]);
+  const [, setPendingCalls] = useState<any[]>([]);
   const channelRef = useRef<any>(null);
   const [localTableNumber, setLocalTableNumber] = useState(() => 
     localStorage.getItem(`service_table_${restaurantId}`) || ""
