@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
         billing_cycle: billingCycle,
         razorpay_subscription_id: subscriptionData.id,
         status: "pending",
-        expires_at: new Date(Date.now() + 1 * 60 * 1000).toISOString(), // 1 minute expiry
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes expiry
       });
 
     if (pendingError) {
