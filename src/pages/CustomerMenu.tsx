@@ -245,9 +245,10 @@ const CustomerMenu = () => {
         const { data: subStatus } = await supabase
           .rpc("get_restaurant_subscription_status" as any, { p_restaurant_id: restaurantId });
         const statusArray = subStatus as any[];
-        if (statusArray && statusArray.length > 0 && !statusArray[0].is_subscription_active) {
+        // Block if no subscription OR subscription is not active
+        if (!statusArray || statusArray.length === 0 || !statusArray[0].is_subscription_active) {
           setSubscriptionExpired(true);
-          setRestaurantContact({ name: data.name, email: data.email, phone: data.phone });
+          setRestaurantContact({ name: data?.name, email: data?.email, phone: data?.phone });
         }
       }
       return data;

@@ -2,30 +2,62 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useSubscription } from "@/hooks/useSubscription";
-import { 
-  createSubscription, 
-  verifyPayment, 
-  openRazorpayCheckout 
+import {
+  createSubscription,
+  verifyPayment,
+  openRazorpayCheckout,
 } from "@/lib/razorpay";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Calendar, Clock, CreditCard, Check, Star, ArrowRight, Loader2, AlertCircle
+import {
+  Calendar,
+  Clock,
+  CreditCard,
+  Check,
+  Star,
+  ArrowRight,
+  Loader2,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format, differenceInDays, isPast } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 const SubscriptionManagement = () => {
   const { subscription, plans, refreshSubscription } = useSubscription();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
 
-  const currentPlan = plans.find(p => p.slug === subscription?.plan_slug);
-  const isExpired = subscription?.current_period_end && isPast(new Date(subscription.current_period_end));
-  const daysRemaining = subscription?.current_period_end 
+  const currentPlan = plans.find((p) => p.slug === subscription?.plan_slug);
+  const isExpired =
+    subscription?.current_period_end &&
+    isPast(new Date(subscription.current_period_end));
+  const daysRemaining = subscription?.current_period_end
     ? differenceInDays(new Date(subscription.current_period_end), new Date())
     : null;
+
 
   const handleUpgrade = async (planId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -46,7 +78,7 @@ const SubscriptionManagement = () => {
         key: razorpayKeyId,
         subscription_id: subscriptionId,
         name: "AddMenu",
-        description: `Upgrade to ${plans.find(p => p.id === planId)?.name}`,
+        description: `Upgrade to ${plans.find((p) => p.id === planId)?.name}`,
         prefill: { email: user.email || "" },
         theme: { color: "#f97316" },
         handler: async (response) => {
@@ -83,232 +115,294 @@ const SubscriptionManagement = () => {
     await handleUpgrade(currentPlan.id);
   };
 
-  const formatPrice = (price: number) => 
+  const handleCancelSubscription = async () => {
+    if (confirmText !== "CONFIRM") {
+      toast({ title: "Please type CONFIRM to proceed", variant: "destructive" });
+      return;
+    }
+
+    setCancelLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.rpc("cancel_user_subscription" as any, {
+        p_user_id: user.id,
+      }) as { data: { success: boolean; error?: string } | null; error: any };
+
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || "Failed to cancel subscription");
+
+      toast({
+        title: "Subscription Cancelled",
+        description: "Your service has been deactivated. No refunds are provided.",
+        variant: "destructive",
+      });
+
+      setCancelDialogOpen(false);
+      setConfirmText("");
+      await refreshSubscription();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  const formatPrice = (price: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(price);
 
-  // No subscription or expired
-  if (!subscription?.is_active || isExpired) {
+  // No subscription or expired - show plans
+  if (!subscription?.has_subscription || !subscription?.is_active || isExpired) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold">Subscription</h2>
-          <p className="text-muted-foreground">Manage your subscription plan</p>
-        </div>
-
-        {/* Expired Warning */}
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="h-6 w-6 text-red-500" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-red-800 dark:text-red-200">
-                  {isExpired ? "Subscription Expired" : "No Active Subscription"}
-                </h3>
-                <p className="text-red-600 dark:text-red-300 text-sm mt-1">
-                  {isExpired 
-                    ? "Your subscription has expired. Renew now to continue using all features."
-                    : "Subscribe to a plan to access all features."}
-                </p>
-                {isExpired && subscription?.current_period_end && (
-                  <p className="text-red-500 text-xs mt-2">
-                    Expired on {format(new Date(subscription.current_period_end), "MMM d, yyyy")}
-                  </p>
-                )}
-              </div>
-            </div>
+        <Card className="rounded-2xl shadow-lg border-0 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-600">
+              <AlertCircle className="h-5 w-5" />
+              {isExpired ? "Subscription Expired" : "No Active Subscription"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              {isExpired
+                ? "Your subscription has expired. Renew to continue using all features."
+                : "Subscribe to a plan to unlock all features and start serving your customers."}
+            </p>
           </CardContent>
         </Card>
 
-        {/* Plans */}
-        <div className="grid gap-4">
-          {plans.map((plan) => {
-            const isPopular = plan.has_orders_feature;
-            return (
-              <Card key={plan.id} className={`relative ${isPopular ? "border-orange-500 border-2" : ""}`}>
-                {isPopular && (
-                  <Badge className="absolute -top-3 right-4 bg-orange-500 text-white">Best Value</Badge>
-                )}
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        isPopular ? "bg-orange-500 text-white" : "bg-gray-100 dark:bg-gray-800"
-                      }`}>
-                        {isPopular ? <Star className="h-6 w-6" /> : <Check className="h-6 w-6" />}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{plan.name}</h3>
-                        <p className="text-sm text-muted-foreground">{plan.description}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">{formatPrice(plan.price_monthly)}</div>
-                      <div className="text-sm text-muted-foreground">/month</div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    {plan.features.slice(0, 4).map((feature, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm">
-                        <Check className="h-4 w-4 text-green-500" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={() => handleUpgrade(plan.id)}
-                    disabled={loading && selectedPlanId === plan.id}
-                    className={`w-full mt-4 ${isPopular ? "bg-orange-500 hover:bg-orange-600" : ""}`}
-                  >
-                    {loading && selectedPlanId === plan.id ? (
-                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
-                    ) : (
-                      <><CreditCard className="h-4 w-4 mr-2" /> Subscribe Now</>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="grid gap-6 md:grid-cols-2">
+          {plans.map((plan) => (
+            <Card
+              key={plan.id}
+              className="rounded-2xl shadow-lg border-0 hover:shadow-xl transition-all duration-300"
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  {plan.has_orders_feature && (
+                    <Badge className="bg-gradient-to-r from-orange-500 to-amber-500 text-white">
+                      <Star className="h-3 w-3 mr-1" />
+                      Popular
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">{plan.description}</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold">{formatPrice(plan.price_monthly)}</span>
+                  <span className="text-muted-foreground">/month</span>
+                </div>
+                <ul className="space-y-2">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
+                  onClick={() => handleUpgrade(plan.id)}
+                  disabled={loading && selectedPlanId === plan.id}
+                >
+                  {loading && selectedPlanId === plan.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                  )}
+                  Subscribe Now
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
   }
 
   // Active subscription view
-  const upgradePlan = plans.find(p => p.has_orders_feature && p.slug !== subscription?.plan_slug);
-
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Subscription</h2>
-        <p className="text-muted-foreground">Your subscription details</p>
-      </div>
-
       {/* Current Plan Card */}
-      <Card>
-        <CardHeader className="pb-4">
+      <Card className="rounded-2xl shadow-lg border-0 overflow-hidden">
+        <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-6 text-white">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Current Plan</CardTitle>
-            <Badge variant={subscription?.is_active ? "default" : "destructive"} className="bg-green-500">
-              {subscription?.is_active ? "Active" : "Inactive"}
+            <div>
+              <p className="text-orange-100 text-sm">Current Plan</p>
+              <h2 className="text-2xl font-bold">{currentPlan?.name || subscription.plan_name}</h2>
+            </div>
+            <Badge className="bg-white/20 text-white border-0 text-sm px-3 py-1">
+              {subscription.subscription_status === "active" ? "Active" : subscription.subscription_status}
             </Badge>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Plan Info */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-xl flex items-center justify-center">
-                <CreditCard className="h-6 w-6 text-orange-500" />
-              </div>
+        </div>
+        <CardContent className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+              <Calendar className="h-5 w-5 text-orange-500" />
               <div>
-                <h3 className="font-semibold text-lg">{subscription?.plan_name || "No Plan"}</h3>
-                <p className="text-sm text-muted-foreground">{currentPlan?.description}</p>
+                <p className="text-xs text-muted-foreground">Billing Period</p>
+                <p className="font-medium">
+                  {subscription.current_period_end
+                    ? format(new Date(subscription.current_period_end), "MMM dd, yyyy")
+                    : "N/A"}
+                </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold">{formatPrice(currentPlan?.price_monthly || 0)}</div>
-              <div className="text-sm text-muted-foreground">/month</div>
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+              <Clock className="h-5 w-5 text-orange-500" />
+              <div>
+                <p className="text-xs text-muted-foreground">Days Remaining</p>
+                <p className="font-medium">
+                  {daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} days` : "Expiring soon"}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Dates */}
-          {subscription?.current_period_end && (
-            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Started</p>
-                  <p className="font-medium">
-                    {format(new Date(subscription.current_period_end).setMonth(
-                      new Date(subscription.current_period_end).getMonth() - 1
-                    ), "d MMM yyyy")}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Expires</p>
-                  <p className="font-medium">
-                    {format(new Date(subscription.current_period_end), "d MMM yyyy")}
-                  </p>
-                </div>
-              </div>
+          {/* Features */}
+          {currentPlan && (
+            <div className="pt-4 border-t">
+              <p className="text-sm font-medium mb-3">Plan Features</p>
+              <ul className="grid grid-cols-2 gap-2">
+                {currentPlan.features.map((feature, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
-          {/* Days Remaining */}
-          {daysRemaining !== null && daysRemaining > 0 && (
-            <div className={`flex items-center gap-3 p-4 rounded-xl ${
-              daysRemaining <= 7 
-                ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300" 
-                : "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
-            }`}>
-              <Clock className="h-5 w-5" />
-              <div>
-                <p className="font-medium">{daysRemaining} days remaining</p>
-                <p className="text-sm opacity-80">Your subscription is active</p>
-              </div>
-            </div>
-          )}
-
-          {/* Renew/Change Plan Button */}
-          <div className="flex gap-3">
-            {daysRemaining !== null && daysRemaining <= 7 && (
-              <Button onClick={handleRenew} className="flex-1 bg-orange-500 hover:bg-orange-600">
-                <CreditCard className="h-4 w-4 mr-2" /> Renew Now
+          {/* Advanced Options - Hidden by default */}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between text-muted-foreground hover:text-foreground mt-4"
+              >
+                <span className="text-sm">Advanced Options</span>
+                {showAdvanced ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
               </Button>
-            )}
-            <Button variant="outline" className="flex-1" onClick={() => {}}>
-              Change Plan
-            </Button>
-          </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-4">
+              <Card className="rounded-xl border-destructive/30 bg-destructive/5">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                    <div className="space-y-2">
+                      <p className="font-medium text-destructive">Cancel Subscription</p>
+                      <p className="text-sm text-muted-foreground">
+                        Cancelling will immediately deactivate your account. No refunds are provided.
+                        You will need to resubscribe to use the service again.
+                      </p>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="rounded-lg mt-2"
+                        onClick={() => setCancelDialogOpen(true)}
+                      >
+                        Cancel Subscription
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 
-      {/* Upgrade Card (if on basic plan) */}
-      {upgradePlan && !currentPlan?.has_orders_feature && (
-        <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
+      {/* Upgrade Card - Show if not on premium */}
+      {!subscription.has_orders_feature && (
+        <Card className="rounded-2xl shadow-lg border-0 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30">
           <CardContent className="p-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Star className="h-6 w-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg">Upgrade to {upgradePlan.name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Get order management, real-time notifications, and customer feedback collection.
-                </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {upgradePlan.features.slice(0, 3).map((feature, idx) => (
-                    <Badge key={idx} variant="secondary" className="text-xs">
-                      <Check className="h-3 w-3 mr-1" /> {feature}
-                    </Badge>
-                  ))}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500">
+                  <CreditCard className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Upgrade to Premium</p>
+                  <p className="text-sm text-muted-foreground">
+                    Unlock orders feature and unlimited menu items
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xl font-bold text-orange-600">{formatPrice(upgradePlan.price_monthly)}</div>
-                <div className="text-xs text-muted-foreground">/month</div>
-              </div>
+              <Button
+                className="rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600"
+                onClick={() => {
+                  const premiumPlan = plans.find((p) => p.has_orders_feature);
+                  if (premiumPlan) handleUpgrade(premiumPlan.id);
+                }}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Upgrade"}
+              </Button>
             </div>
-            <Button 
-              onClick={() => handleUpgrade(upgradePlan.id)}
-              disabled={loading}
-              className="w-full mt-4 bg-orange-500 hover:bg-orange-600"
-            >
-              {loading ? (
-                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
-              ) : (
-                <>Upgrade Now <ArrowRight className="h-4 w-4 ml-2" /></>
-              )}
-            </Button>
           </CardContent>
         </Card>
       )}
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Cancel Subscription
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                This action will <strong>immediately deactivate</strong> your account.
+                You will lose access to all features and your menu will no longer be visible to customers.
+              </p>
+              <p className="text-destructive font-medium">
+                No refunds will be provided for the remaining subscription period.
+              </p>
+              <div className="pt-2">
+                <p className="text-sm mb-2">
+                  Type <strong>CONFIRM</strong> to proceed:
+                </p>
+                <Input
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+                  placeholder="Type CONFIRM"
+                  className="rounded-lg"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="rounded-lg"
+              onClick={() => {
+                setConfirmText("");
+              }}
+            >
+              Keep Subscription
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-lg bg-destructive hover:bg-destructive/90"
+              onClick={handleCancelSubscription}
+              disabled={confirmText !== "CONFIRM" || cancelLoading}
+            >
+              {cancelLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Cancel Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
