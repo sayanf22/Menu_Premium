@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, Upload, X } from "lucide-react";
-import { uploadToR2WithProgress } from "@/lib/r2Upload";
+import { uploadToR2WithProgress, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 
 interface RestaurantProfileProps {
   restaurantId: string;
@@ -93,6 +93,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null); // Track original for cleanup
 
   useEffect(() => {
     fetchRestaurantData();
@@ -112,6 +113,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       setName(data.name || "");
       setDescription(data.description || "");
       setLogoUrl(data.logo_url || null);
+      setOriginalLogoUrl(data.logo_url || null); // Store original for cleanup
     } catch (error: any) {
       toast({
         title: "Error",
@@ -211,6 +213,20 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
         .eq("id", restaurantId);
 
       if (error) throw error;
+
+      // Delete old logo from R2 if it was changed or removed
+      if (originalLogoUrl && originalLogoUrl !== logoUrl && isR2Url(originalLogoUrl)) {
+        deleteFromR2(originalLogoUrl).then(result => {
+          if (result.success) {
+            console.log("✅ Old logo deleted from R2:", originalLogoUrl);
+          } else {
+            console.warn("⚠️ Failed to delete old logo from R2:", result.error);
+          }
+        });
+      }
+
+      // Update original URL to current
+      setOriginalLogoUrl(logoUrl);
 
       toast({
         title: "Success",

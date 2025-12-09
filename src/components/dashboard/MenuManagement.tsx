@@ -10,7 +10,7 @@ import { Plus, Edit2, Trash2, FolderPlus, Loader2, AlertCircle } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { uploadToR2WithProgress, validateFile } from "@/lib/r2Upload";
+import { uploadToR2WithProgress, validateFile, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -241,6 +241,7 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
 
     try {
       let imageUrl = editingItem?.image_url || "";
+      const oldImageUrl = editingItem?.image_url;
 
       if (imageFile) {
         imageUrl = await uploadImage(imageFile);
@@ -263,6 +264,18 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
           .eq("id", editingItem.id);
 
         if (error) throw error;
+
+        // Delete old image from R2 if a new image was uploaded
+        if (imageFile && oldImageUrl && oldImageUrl !== imageUrl && isR2Url(oldImageUrl)) {
+          deleteFromR2(oldImageUrl).then(result => {
+            if (result.success) {
+              console.log("✅ Old image deleted from R2:", oldImageUrl);
+            } else {
+              console.warn("⚠️ Failed to delete old image from R2:", result.error);
+            }
+          });
+        }
+
         toast({ title: "Menu item updated successfully" });
       } else {
         const { error } = await supabase
@@ -313,12 +326,29 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
     if (!confirm("Are you sure you want to delete this item?")) return;
 
     try {
+      // Find the item to get its image URL before deleting
+      const itemToDelete = menuItems.find(item => item.id === id);
+      const imageUrl = itemToDelete?.image_url;
+
+      // Delete from database first
       const { error } = await supabase
         .from("menu_items")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+
+      // Delete image from R2 storage (fire and forget - don't block on this)
+      if (imageUrl && isR2Url(imageUrl)) {
+        deleteFromR2(imageUrl).then(result => {
+          if (result.success) {
+            console.log("✅ Image deleted from R2:", imageUrl);
+          } else {
+            console.warn("⚠️ Failed to delete image from R2:", result.error);
+          }
+        });
+      }
+
       toast({ title: "Menu item deleted" });
       fetchMenuItems();
     } catch (error: any) {

@@ -199,8 +199,7 @@ export async function uploadToR2WithProgress(
 }
 
 /**
- * Delete file from R2 (requires Edge Function)
- * Note: For now, old images are kept. Implement cleanup later if needed.
+ * Get R2 public URL from key
  */
 export function getR2PublicUrl(key: string): string {
   return `${R2_PUBLIC_URL}/${key}`;
@@ -211,4 +210,81 @@ export function getR2PublicUrl(key: string): string {
  */
 export function isR2Url(url: string): boolean {
   return url.includes("r2.dev") || url.includes("r2.cloudflarestorage.com");
+}
+
+/**
+ * Delete a single file from R2 storage
+ * @param imageUrl - The public URL of the image to delete
+ * @returns Promise with success status
+ */
+export async function deleteFromR2(imageUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Skip if not an R2 URL
+    if (!isR2Url(imageUrl)) {
+      console.log("Skipping non-R2 URL:", imageUrl);
+      return { success: true }; // Not an error, just skip
+    }
+
+    const { data, error } = await supabase.functions.invoke("r2-delete", {
+      body: { imageUrl },
+    });
+
+    if (error) {
+      console.error("R2 delete error:", error);
+      return { success: false, error: error.message };
+    }
+
+    if (data?.error) {
+      console.error("R2 delete error:", data.error);
+      return { success: false, error: data.error };
+    }
+
+    console.log("✅ Deleted from R2:", imageUrl);
+    return { success: true };
+  } catch (err: any) {
+    console.error("R2 delete exception:", err);
+    return { success: false, error: err.message || "Failed to delete image" };
+  }
+}
+
+/**
+ * Delete multiple files from R2 storage
+ * @param imageUrls - Array of public URLs to delete
+ * @returns Promise with results for each URL
+ */
+export async function deleteMultipleFromR2(
+  imageUrls: string[]
+): Promise<{ success: boolean; results: { url: string; success: boolean; error?: string }[] }> {
+  try {
+    // Filter to only R2 URLs
+    const r2Urls = imageUrls.filter(isR2Url);
+    
+    if (r2Urls.length === 0) {
+      return { success: true, results: [] };
+    }
+
+    const { data, error } = await supabase.functions.invoke("r2-delete", {
+      body: { imageUrls: r2Urls },
+    });
+
+    if (error) {
+      console.error("R2 bulk delete error:", error);
+      return { 
+        success: false, 
+        results: r2Urls.map(url => ({ url, success: false, error: error.message }))
+      };
+    }
+
+    console.log(`✅ Bulk delete from R2: ${data?.results?.filter((r: any) => r.success).length}/${r2Urls.length} files`);
+    return { 
+      success: data?.success || false, 
+      results: data?.results || [] 
+    };
+  } catch (err: any) {
+    console.error("R2 bulk delete exception:", err);
+    return { 
+      success: false, 
+      results: imageUrls.map(url => ({ url, success: false, error: err.message }))
+    };
+  }
 }
