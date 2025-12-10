@@ -439,7 +439,7 @@ const CustomerMenu = () => {
           
           if (payload.new.status === "completed" && payload.old?.status !== "completed") {
             if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
-            toast({ title: "🎉 Order Ready!", description: `Order #${payload.new.order_number} is ready!`, duration: 8000 });
+            toast({ title: "🎉 Order Complete!", description: `Order #${payload.new.order_number} is being served!`, duration: 8000 });
           }
         })
         .subscribe((status, err) => {
@@ -1137,7 +1137,7 @@ const CustomerMenu = () => {
                       {activeOrders.length === 1 ? `Order #${activeOrders[0].order_number}` : `${activeOrders.length} Orders`}
                     </p>
                     <p className="text-sm opacity-90">
-                      {activeOrders.every(o => o.status === "completed") ? '✓ Ready for pickup!' : 'Cooking your food...'}
+                      {activeOrders.every(o => o.status === "completed") ? '✓ Enjoy your meal!' : 'Cooking your food...'}
                     </p>
                   </div>
                 </div>
@@ -1282,8 +1282,8 @@ const CustomerMenu = () => {
                 <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-white/20 flex items-center justify-center">
                   <CheckCircle2 className="w-12 h-12 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-white">Ready for Pickup!</h3>
-                <p className="text-white/80 mt-2">Your order is waiting</p>
+                <h3 className="text-2xl font-bold text-white">Order Complete!</h3>
+                <p className="text-white/80 mt-2">Hope you enjoy your meal</p>
               </motion.div>
             ) : (
               <>
