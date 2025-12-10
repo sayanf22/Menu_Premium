@@ -722,8 +722,8 @@ const CustomerMenu = () => {
         transition={springConfig}
         className="sticky top-0 z-50 bg-white dark:bg-black"
       >
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16 sm:h-18">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Logo & Name - Hidden when search is open on mobile */}
             <AnimatePresence mode="wait">
               {!isSearchOpen && (
@@ -795,54 +795,35 @@ const CustomerMenu = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-1 sm:gap-2"
                   >
                     <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => { setIsSearchOpen(true); setTimeout(() => searchInputRef.current?.focus(), 100); }}
-                      className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+                      className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                     >
-                      <Search className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
+                      <Search className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-600 dark:text-zinc-400" />
                     </motion.button>
                     <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => setIsDarkMode(!isDarkMode)}
-                      className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
+                      className="p-2 sm:p-2.5 rounded-lg sm:rounded-xl bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                     >
-                      {isDarkMode ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-zinc-600" />}
+                      {isDarkMode ? <Sun className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" /> : <Moon className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-600" />}
                     </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
-              {/* Order History Button - always visible when there are orders */}
-              <AnimatePresence>
-                {activeOrders.length > 0 && (
-                  <motion.button
-                    key="header-history-btn"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0, opacity: 0 }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setShowOrderHistoryDialog(true)}
-                    className="p-2.5 rounded-xl bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors relative ml-2"
-                  >
-                    <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {activeOrders.length}
-                    </span>
-                  </motion.button>
-                )}
-              </AnimatePresence>
+
             </motion.div>
           </div>
         </div>
       </motion.header>
 
-      {/* Category Pills - Clean design with proper spacing */}
-      <div className="sticky top-16 sm:top-[72px] z-40 bg-white dark:bg-black py-3 px-4 sm:px-6">
+      {/* Category Pills - Mobile Optimized */}
+      <div className="sticky top-14 sm:top-16 z-40 bg-white dark:bg-black py-2 sm:py-3 px-3 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <div 
             className="flex gap-2 sm:gap-3 overflow-x-auto py-1 -my-1 px-1 -mx-1"
@@ -1059,7 +1040,7 @@ const CustomerMenu = () => {
       {/* Service Call Button - Waiter/Water/Bill */}
       <ServiceCallButton restaurantId={restaurantId || ""} tableNumber={tableNumber} />
 
-      {/* Floating Order History Button - Top Right - Always visible when orders exist */}
+      {/* Floating Order History Button - Mobile Optimized */}
       <AnimatePresence>
         {activeOrders.length > 0 && (
           <motion.button
@@ -1067,14 +1048,14 @@ const CustomerMenu = () => {
             initial={{ scale: 0, opacity: 0, y: -20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0, y: -20 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             transition={bounceConfig}
             onClick={() => setShowOrderHistoryDialog(true)}
-            className="fixed top-20 right-4 z-[150] w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-xl shadow-orange-500/40 flex items-center justify-center border-2 border-white/30"
+            className="fixed top-16 sm:top-20 right-3 sm:right-4 z-[150] w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-xl shadow-orange-500/40 flex items-center justify-center border-2 border-white/30"
           >
-            <Clock className="w-6 h-6" />
-            <span className="absolute -top-2 -right-2 w-6 h-6 bg-white text-orange-600 text-xs font-bold rounded-full flex items-center justify-center shadow-lg border border-orange-200">
+            <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+            <span className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 bg-white text-orange-600 text-[10px] sm:text-xs font-bold rounded-full flex items-center justify-center shadow-lg border border-orange-200">
               {activeOrders.length}
             </span>
           </motion.button>
