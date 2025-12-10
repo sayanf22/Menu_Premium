@@ -10,6 +10,7 @@ interface ServiceCallButtonProps {
   restaurantId: string;
   tableNumber?: string;
   disabled?: boolean;
+  hasActiveOrders?: boolean;
 }
 
 const SERVICE_OPTIONS = [
@@ -20,7 +21,7 @@ const SERVICE_OPTIONS = [
 
 type CallType = typeof SERVICE_OPTIONS[number]["type"];
 
-const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disabled }: ServiceCallButtonProps) => {
+const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disabled, hasActiveOrders = false }: ServiceCallButtonProps) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState<CallType | null>(null);
@@ -240,7 +241,9 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.5 }}
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-24 left-4 z-40 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
+        className={`fixed left-3 sm:left-4 z-50 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ${
+          hasActiveOrders ? 'bottom-40' : 'bottom-6'
+        }`}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
       >

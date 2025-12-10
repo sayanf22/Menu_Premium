@@ -1038,7 +1038,11 @@ const CustomerMenu = () => {
       </main>
 
       {/* Service Call Button - Waiter/Water/Bill */}
-      <ServiceCallButton restaurantId={restaurantId || ""} tableNumber={tableNumber} />
+      <ServiceCallButton 
+        restaurantId={restaurantId || ""} 
+        tableNumber={tableNumber} 
+        hasActiveOrders={activeOrders.length > 0}
+      />
 
       {/* Floating Order History Button - Mobile Optimized */}
       <AnimatePresence>
