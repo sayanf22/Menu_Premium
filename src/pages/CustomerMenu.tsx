@@ -12,13 +12,14 @@ import {
   ShoppingCart, Plus, Minus, X, Search, Moon, Sun, Clock, 
   CheckCircle2, ArrowRight, Utensils, Sparkles, Salad, UtensilsCrossed, 
   Coffee, IceCream, Wine, Soup, Pizza, Sandwich, Flame, Leaf, Fish, Beef, Cookie,
-  Instagram, Facebook, Twitter, Globe, ChevronDown, ChevronUp
+  Instagram, Facebook, Twitter, Globe, ChevronDown
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { isRateLimited, RATE_LIMITS, isValidUUID, isValidTableNumber, sanitizeInput, getClientFingerprint } from "@/lib/security";
+import { registerReconnectCallback, unregisterReconnectCallback } from "@/lib/realtimeOptimization";
 import ServiceCallButton from "@/components/ServiceCallButton";
 
 // Animation configs
@@ -147,6 +148,7 @@ const CustomerMenu = () => {
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false); // Track if user dismissed feedback
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [currentOrder, setCurrentOrder] = useState<any>(null);
@@ -154,14 +156,16 @@ const CustomerMenu = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCartDialog, setShowCartDialog] = useState(false);
   const [showOrderStatusDialog, setShowOrderStatusDialog] = useState(false);
+  const [showOrderHistoryDialog, setShowOrderHistoryDialog] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('customer-menu-theme') === 'dark');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [serviceDisabled, setServiceDisabled] = useState(false);
-  const [restaurantContact, setRestaurantContact] = useState<{ name: string; email: string; phone: string | null; } | null>(null);
+  const [restaurantContact, setRestaurantContact] = useState<{ name: string; email: string; phone: string | null } | null>(null);
   const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const feedbackDismissedRef = useRef(false); // Ref for realtime callback access
   
   // Session management
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -179,7 +183,7 @@ const CustomerMenu = () => {
   useEffect(() => {
     if (!menuSessionId) {
       // No session - allow access for backward compatibility but show warning
-      console.log("⚠️ No session ID - direct access");
+      if (import.meta.env.DEV) console.log("⚠️ No session ID - direct access");
       return;
     }
 
@@ -325,11 +329,40 @@ const CustomerMenu = () => {
     }
   }, [restaurantId]);
 
+  // Subscribe to realtime updates when we have active orders
   useEffect(() => {
-    if (activeOrders.length > 0) {
+    if (activeOrders.length > 0 && restaurantId) {
       const cleanup = subscribeToOrderUpdates();
       return cleanup;
     }
+  }, [activeOrders.length > 0, restaurantId]);
+
+  // Polling fallback - refresh orders every 10 seconds as backup (only when orders are incomplete)
+  useEffect(() => {
+    if (activeOrders.length === 0 || !restaurantId) return;
+    
+    const hasIncomplete = activeOrders.some(o => o.status !== 'completed');
+    if (!hasIncomplete) return; // Stop polling once all orders are completed
+
+    const pollOrders = async () => {
+      const orderIdsStr = localStorage.getItem(`orders_${restaurantId}_${sessionId}`);
+      if (!orderIdsStr) return;
+      const orderIds = JSON.parse(orderIdsStr);
+      const { data: orders } = await supabase.from("orders").select("*").in("id", orderIds);
+      if (orders && orders.length > 0) {
+        setActiveOrders(orders);
+        setCurrentOrder(orders[orders.length - 1]);
+        // Only show feedback ONCE when all orders complete - use ref to check
+        if (orders.every(o => o.status === 'completed') && !feedbackDismissedRef.current) {
+          feedbackDismissedRef.current = true; // Prevent showing again
+          setFeedbackDismissed(true);
+          setTimeout(() => setShowFeedback(true), 500);
+        }
+      }
+    };
+
+    const interval = setInterval(pollOrders, 10000);
+    return () => clearInterval(interval);
   }, [activeOrders.length, restaurantId, sessionId]);
 
   const cleanupOldOrders = () => {
@@ -337,7 +370,8 @@ const CustomerMenu = () => {
     const orderTimestampStr = localStorage.getItem(`orders_timestamp_${restaurantId}_${sessionId}`);
     if (orderIdsStr && orderTimestampStr) {
       const timestamp = parseInt(orderTimestampStr);
-      if (timestamp < Date.now() - 6 * 60 * 60 * 1000) {
+      // Expire orders after 90 minutes (same as menu session)
+      if (timestamp < Date.now() - 90 * 60 * 1000) {
         localStorage.removeItem(`orders_${restaurantId}_${sessionId}`);
         localStorage.removeItem(`orders_timestamp_${restaurantId}_${sessionId}`);
         setActiveOrders([]);
@@ -355,9 +389,7 @@ const CustomerMenu = () => {
         setActiveOrders(orders);
         setCurrentOrder(orders[orders.length - 1]);
         setTableNumber(orders[orders.length - 1].table_number);
-        const allCompleted = orders.every(o => o.status === "completed");
-        const hasActive = orders.some(o => o.status === "preparing" || o.status === "pending");
-        if (allCompleted && !hasActive) setShowFeedback(true);
+        // Don't auto-show feedback on page load - let user view history first
       }
     }
   };
@@ -365,32 +397,57 @@ const CustomerMenu = () => {
   const subscribeToOrderUpdates = () => {
     const orderIdsStr = localStorage.getItem(`orders_${restaurantId}_${sessionId}`);
     if (!orderIdsStr) return () => {};
-    const orderIds = JSON.parse(orderIdsStr);
+    const orderIds: string[] = JSON.parse(orderIdsStr);
     if (orderIds.length === 0) return () => {};
 
-    const channelName = `orders-realtime-${restaurantId}-${sessionId}`;
+    // Use unique channel name per session
+    const channelName = `orders-${restaurantId}-${sessionId}`;
+    
+    // Remove any existing channel with same name first
+    const existingChannels = supabase.getChannels();
+    existingChannels.forEach(ch => {
+      if (ch.topic.includes(channelName)) {
+        supabase.removeChannel(ch);
+      }
+    });
     
     const setupChannel = () => {
-      return supabase
-        .channel(channelName)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=in.(${orderIds.join(',')})` }, (payload) => {
+      if (import.meta.env.DEV) console.log('📡 Setting up realtime for orders:', orderIds);
+      const channel = supabase
+        .channel(channelName, { config: { broadcast: { self: true } } })
+        .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `restaurant_id=eq.${restaurantId}`
+        }, (payload: any) => {
+          // Filter client-side for our specific orders
           if (!orderIds.includes(payload.new.id)) return;
+          if (import.meta.env.DEV) console.log('📦 Order update received:', payload.new.id, payload.new.status);
+          
           setActiveOrders(prev => {
             const updated = prev.map(order => order.id === payload.new.id ? { ...payload.new } : order);
-            if (updated.every(o => o.status === 'completed')) setTimeout(() => setShowFeedback(true), 500);
+            // Only show feedback ONCE when all orders complete
+            if (updated.every(o => o.status === 'completed') && !feedbackDismissedRef.current) {
+              feedbackDismissedRef.current = true; // Prevent showing again
+              setFeedbackDismissed(true);
+              setTimeout(() => setShowFeedback(true), 500);
+            }
             return updated;
           });
           setCurrentOrder(prev => prev?.id === payload.new.id ? { ...payload.new } : prev);
-          if (payload.new.status === "completed" && payload.old.status !== "completed") {
+          
+          if (payload.new.status === "completed" && payload.old?.status !== "completed") {
             if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
             toast({ title: "🎉 Order Ready!", description: `Order #${payload.new.order_number} is ready!`, duration: 8000 });
           }
         })
-        .subscribe();
+        .subscribe((status, err) => {
+          if (import.meta.env.DEV) console.log('📡 Realtime subscription status:', status, err || '');
+        });
+      return channel;
     };
 
-    // Use managed subscription with auto-reconnect on tab visibility
-    const { registerReconnectCallback, unregisterReconnectCallback } = require("@/lib/realtimeOptimization");
     let channel = setupChannel();
     
     registerReconnectCallback(channelName, () => {
@@ -400,7 +457,7 @@ const CustomerMenu = () => {
 
     return () => {
       unregisterReconnectCallback(channelName);
-      supabase.removeChannel(channel);
+      try { supabase.removeChannel(channel); } catch (e) { /* ignore */ }
     };
   };
 
@@ -484,14 +541,23 @@ const CustomerMenu = () => {
       return;
     }
     await supabase.from("feedback").insert([{ order_id: currentOrder.id, restaurant_id: restaurantId, rating, comment: sanitizeInput(comment.trim()) || null }]);
-    localStorage.removeItem(`orders_${restaurantId}_${sessionId}`);
-    localStorage.removeItem(`orders_timestamp_${restaurantId}_${sessionId}`);
+    // Mark feedback as submitted for this order but DON'T clear orders - they persist for 90 mins
+    localStorage.setItem(`feedback_submitted_${currentOrder.id}`, 'true');
     toast({ title: "Thank you!", description: "Your feedback helps us improve!", duration: 4000 });
     setShowFeedback(false);
-    setCurrentOrder(null);
-    setActiveOrders([]);
     setRating(0);
     setComment("");
+    // Keep activeOrders and currentOrder - user can still view history for 90 mins
+  };
+
+  // Skip feedback - just close dialog without clearing orders
+  const skipFeedback = () => {
+    setShowFeedback(false);
+    setFeedbackDismissed(true); // Don't show feedback again this session
+    feedbackDismissedRef.current = true; // Also update ref for realtime callback
+    setRating(0);
+    setComment("");
+    // Orders remain visible in history for 90 mins
   };
 
   // Memoized data
@@ -750,6 +816,26 @@ const CustomerMenu = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
+              {/* Order History Button - always visible when there are orders */}
+              <AnimatePresence>
+                {activeOrders.length > 0 && (
+                  <motion.button
+                    key="header-history-btn"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setShowOrderHistoryDialog(true)}
+                    className="p-2.5 rounded-xl bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-800/40 transition-colors relative ml-2"
+                  >
+                    <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-orange-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {activeOrders.length}
+                    </span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
             </motion.div>
           </div>
         </div>
@@ -799,8 +885,8 @@ const CustomerMenu = () => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <main className={`max-w-4xl mx-auto px-4 sm:px-6 pt-4 pb-8 ${activeOrders.length > 0 ? 'pb-40' : cart.length > 0 ? 'pb-32' : 'pb-8'}`}>
+      {/* Main Content - Extra padding at bottom when order status bar or cart is visible */}
+      <main className={`max-w-4xl mx-auto px-4 sm:px-6 pt-4 ${activeOrders.length > 0 && cart.length > 0 ? 'pb-52' : activeOrders.length > 0 ? 'pb-36' : cart.length > 0 ? 'pb-32' : 'pb-8'}`}>
         
         {/* Search Results */}
         {searchQuery && (
@@ -961,7 +1047,7 @@ const CustomerMenu = () => {
             )}
 
             {/* Powered By AddMenu */}
-            <div className="text-center pb-4">
+            <div className="text-center pb-6">
               <p className="text-xs text-zinc-400 dark:text-zinc-500">
                 Powered by <span className="font-semibold text-orange-500">AddMenu</span>
               </p>
@@ -972,6 +1058,28 @@ const CustomerMenu = () => {
 
       {/* Service Call Button - Waiter/Water/Bill */}
       <ServiceCallButton restaurantId={restaurantId || ""} tableNumber={tableNumber} />
+
+      {/* Floating Order History Button - Top Right - Always visible when orders exist */}
+      <AnimatePresence>
+        {activeOrders.length > 0 && (
+          <motion.button
+            key="order-history-fab"
+            initial={{ scale: 0, opacity: 0, y: -20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0, opacity: 0, y: -20 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            transition={bounceConfig}
+            onClick={() => setShowOrderHistoryDialog(true)}
+            className="fixed top-20 right-4 z-[150] w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-xl shadow-orange-500/40 flex items-center justify-center border-2 border-white/30"
+          >
+            <Clock className="w-6 h-6" />
+            <span className="absolute -top-2 -right-2 w-6 h-6 bg-white text-orange-600 text-xs font-bold rounded-full flex items-center justify-center shadow-lg border border-orange-200">
+              {activeOrders.length}
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Floating Cart Button */}
       <AnimatePresence>
@@ -1021,34 +1129,63 @@ const CustomerMenu = () => {
           >
             <button
               onClick={() => setShowOrderStatusDialog(true)}
-              className={`w-full py-4 px-4 flex items-center justify-between ${
+              className={`w-full ${
                 activeOrders.every(o => o.status === "completed")
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
                   : 'bg-gradient-to-r from-amber-500 to-orange-500'
               }`}
             >
-              <div className="flex items-center gap-3">
-                {activeOrders.every(o => o.status === "completed") ? (
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6 text-white" />
+              {/* Main status row */}
+              <div className="flex items-center justify-between py-3 px-4">
+                <div className="flex items-center gap-3">
+                  {activeOrders.every(o => o.status === "completed") ? (
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      <CheckCircle2 className="w-6 h-6 text-white" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      <CookingAnimation size="sm" />
+                    </div>
+                  )}
+                  <div className="text-left text-white">
+                    <p className="font-bold text-base">
+                      {activeOrders.length === 1 ? `Order #${activeOrders[0].order_number}` : `${activeOrders.length} Orders`}
+                    </p>
+                    <p className="text-sm opacity-90">
+                      {activeOrders.every(o => o.status === "completed") ? '✓ Ready for pickup!' : 'Cooking your food...'}
+                    </p>
                   </div>
-                ) : (
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                    <CookingAnimation size="sm" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right text-white">
+                    <p className="font-bold text-lg">
+                      {formatINR(activeOrders.reduce((sum, order) => 
+                        sum + (order.items?.items?.reduce((itemSum: number, item: any) => 
+                          itemSum + (item.price * (item.quantity || 1)), 0) || 0), 0))}
+                    </p>
+                    <p className="text-xs opacity-80">
+                      {activeOrders.reduce((sum, order) => 
+                        sum + (order.items?.items?.reduce((itemSum: number, item: any) => 
+                          itemSum + (item.quantity || 1), 0) || 0), 0)} items
+                    </p>
                   </div>
-                )}
-                <div className="text-left text-white">
-                  <p className="font-bold text-base">
-                    {activeOrders.length === 1 ? `Order #${activeOrders[0].order_number}` : `${activeOrders.length} Orders`}
-                  </p>
-                  <p className="text-sm opacity-90">
-                    {activeOrders.every(o => o.status === "completed") ? '✓ Ready for pickup!' : 'Cooking your food...'}
-                  </p>
+                  <div className="bg-white/20 p-2 rounded-xl">
+                    <ArrowRight className="w-5 h-5 text-white" />
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-white bg-white/20 px-4 py-2 rounded-xl">
-                <ArrowRight className="w-5 h-5" />
-              </div>
+              {/* Items summary row - show when completed */}
+              {activeOrders.every(o => o.status === "completed") && (
+                <div className="px-4 pb-3 pt-0">
+                  <div className="bg-white/10 rounded-xl px-3 py-2">
+                    <p className="text-white/90 text-xs truncate">
+                      {activeOrders.flatMap(o => o.items?.items || []).map((item: any) => 
+                        `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`
+                      ).join(' • ')}
+                    </p>
+                  </div>
+                </div>
+              )}
             </button>
           </motion.div>
         )}
@@ -1239,7 +1376,7 @@ const CustomerMenu = () => {
       </Dialog>
 
       {/* Feedback Dialog - Emoji Rating */}
-      <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
+      <Dialog open={showFeedback} onOpenChange={skipFeedback}>
         <DialogContent className="max-w-sm w-[90vw] p-0 gap-0 rounded-3xl overflow-hidden border-0 shadow-2xl bg-white dark:bg-zinc-900">
           <div className="p-6 bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 text-center">
             <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={bounceConfig}>
@@ -1249,8 +1386,8 @@ const CustomerMenu = () => {
             <p className="text-white/80 text-sm mt-1">Your feedback helps us improve</p>
           </div>
           <div className="p-4 sm:p-6">
-            {/* Emoji Rating */}
-            <div className="flex justify-between sm:justify-center gap-1 sm:gap-3 mb-6 px-2 sm:px-0">
+            {/* Emoji Rating - Centered with proper spacing */}
+            <div className="flex justify-center gap-2 sm:gap-3 mb-6">
               {[
                 { value: 1, emoji: '😞', label: 'Bad' },
                 { value: 2, emoji: '😕', label: 'Okay' },
@@ -1263,14 +1400,14 @@ const CustomerMenu = () => {
                   whileHover={{ scale: 1.1, y: -3 }} 
                   whileTap={{ scale: 0.9 }} 
                   onClick={() => setRating(value)} 
-                  className={`flex flex-col items-center p-1.5 sm:p-2 rounded-xl sm:rounded-2xl transition-all min-w-[52px] sm:min-w-[60px] ${
+                  className={`flex flex-col items-center p-1.5 sm:p-2 rounded-xl transition-all flex-shrink-0 ${
                     rating === value 
                       ? 'bg-amber-100 dark:bg-amber-500/20 ring-2 ring-amber-500' 
                       : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   }`}
                 >
-                  <span className={`text-2xl sm:text-4xl transition-all ${rating === value ? 'scale-110' : 'grayscale opacity-60'}`}>{emoji}</span>
-                  <span className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 font-medium ${rating === value ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'}`}>{label}</span>
+                  <span className={`text-2xl sm:text-3xl transition-all ${rating === value ? 'scale-110' : 'grayscale opacity-60'}`}>{emoji}</span>
+                  <span className={`text-[9px] sm:text-[10px] mt-0.5 font-medium whitespace-nowrap ${rating === value ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-400'}`}>{label}</span>
                 </motion.button>
               ))}
             </div>
@@ -1279,18 +1416,112 @@ const CustomerMenu = () => {
               Submit Feedback
             </Button>
             <button
-              onClick={() => {
-                setShowFeedback(false);
-                localStorage.removeItem(`orders_${restaurantId}_${sessionId}`);
-                localStorage.removeItem(`orders_timestamp_${restaurantId}_${sessionId}`);
-                setActiveOrders([]);
-                setCurrentOrder(null);
-              }}
+              onClick={skipFeedback}
               className="w-full mt-2 sm:mt-3 text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 py-2"
             >
               Maybe later
             </button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order History Dialog */}
+      <Dialog open={showOrderHistoryDialog} onOpenChange={setShowOrderHistoryDialog}>
+        <DialogContent className="max-w-lg w-[95vw] p-0 gap-0 rounded-3xl overflow-hidden border-0 shadow-2xl bg-white dark:bg-zinc-950 z-[200] [&>button]:hidden">
+          <DialogHeader className="p-5 pb-4 bg-gradient-to-r from-orange-500 to-amber-500 relative">
+            <DialogTitle className="text-xl font-bold text-white flex items-center gap-3 pr-10">
+              <Clock className="w-6 h-6" />
+              Your Orders
+              <Badge className="bg-white/20 text-white border-0">{activeOrders.length}</Badge>
+            </DialogTitle>
+            <button 
+              onClick={() => setShowOrderHistoryDialog(false)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </DialogHeader>
+
+          {/* Summary Card */}
+          <div className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border-b border-orange-100 dark:border-orange-900/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Total Spent</p>
+                <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                  {formatINR(activeOrders.reduce((sum, order) => 
+                    sum + (order.items?.items?.reduce((itemSum: number, item: any) => 
+                      itemSum + (item.price * (item.quantity || 1)), 0) || 0), 0))}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">Items Ordered</p>
+                <p className="text-2xl font-bold text-orange-700 dark:text-orange-300">
+                  {activeOrders.reduce((sum, order) => 
+                    sum + (order.items?.items?.reduce((itemSum: number, item: any) => 
+                      itemSum + (item.quantity || 1), 0) || 0), 0)}
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-orange-500 dark:text-orange-400/70 mt-2">
+              Table {tableNumber} • Session expires in ~{remainingMinutes || 90} min
+            </p>
+          </div>
+
+          {/* Orders List */}
+          <ScrollArea className="max-h-[50vh]">
+            <div className="p-4 space-y-4">
+              {activeOrders.map((order, orderIdx) => (
+                <div key={order.id} className="rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                  {/* Order Header */}
+                  <div className={`px-4 py-3 flex items-center justify-between ${
+                    order.status === 'completed' 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30' 
+                      : 'bg-amber-50 dark:bg-amber-950/30'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-900 dark:text-white">#{order.order_number}</span>
+                      <Badge className={order.status === 'completed' 
+                        ? 'bg-emerald-500 text-white text-xs' 
+                        : 'bg-amber-500 text-white text-xs'
+                      }>
+                        {order.status === 'completed' ? '✓ Ready' : '⏳ Cooking'}
+                      </Badge>
+                    </div>
+                    <span className="font-bold text-zinc-900 dark:text-white">
+                      {formatINR(order.items?.items?.reduce((sum: number, item: any) => 
+                        sum + (item.price * (item.quantity || 1)), 0) || 0)}
+                    </span>
+                  </div>
+                  
+                  {/* Order Items */}
+                  <div className="p-4 space-y-3">
+                    {order.items?.items?.map((item: any, idx: number) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        {item.image_url && (
+                          <img 
+                            src={item.image_url} 
+                            alt={item.name} 
+                            className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-zinc-900 dark:text-white truncate">{item.name}</p>
+                          <p className="text-sm text-zinc-500">
+                            {formatINR(item.price)} × {item.quantity || 1}
+                          </p>
+                        </div>
+                        <span className="font-semibold text-zinc-900 dark:text-white">
+                          {formatINR(item.price * (item.quantity || 1))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+
+
         </DialogContent>
       </Dialog>
     </div>
@@ -1342,25 +1573,48 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
             <div>
               <h3 className="font-bold text-zinc-900 dark:text-white text-base sm:text-lg leading-tight">{item.name}</h3>
               {item.description && (
-                <AnimatePresence mode="wait">
+                <motion.div
+                  initial={false}
+                  animate={{ 
+                    height: isExpanded || !hasLongDescription ? 'auto' : '2.5rem',
+                    opacity: 1 
+                  }}
+                  transition={{ 
+                    duration: 0.3, 
+                    ease: [0.4, 0.0, 0.2, 1] // Custom easing for smooth animation
+                  }}
+                  className="overflow-hidden"
+                >
                   <motion.p
-                    key={isExpanded ? 'expanded' : 'collapsed'}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className={`text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed ${!isExpanded && hasLongDescription ? 'line-clamp-2' : ''}`}
+                    animate={{ 
+                      opacity: 1,
+                      y: 0 
+                    }}
+                    transition={{ 
+                      duration: 0.2, 
+                      delay: isExpanded ? 0.1 : 0 
+                    }}
+                    className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed"
                   >
                     {item.description}
                   </motion.p>
-                </AnimatePresence>
+                </motion.div>
               )}
               {hasLongDescription && (
-                <button
+                <motion.button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="text-xs font-medium text-orange-500 hover:text-orange-600 mt-1 flex items-center gap-0.5"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="text-xs font-medium text-orange-500 hover:text-orange-600 mt-2 flex items-center gap-0.5 transition-colors"
                 >
-                  {isExpanded ? 'Less' : 'More'}
-                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                </button>
+                  <span>{isExpanded ? 'Less' : 'More'}</span>
+                  <motion.div
+                    animate={{ rotate: isExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </motion.div>
+                </motion.button>
               )}
             </div>
             
