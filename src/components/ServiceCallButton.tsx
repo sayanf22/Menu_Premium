@@ -235,15 +235,13 @@ const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disable
 
   return (
     <>
-      {/* Floating Bell Button */}
+      {/* Floating Bell Button - Positioned for easy thumb access */}
       <motion.button
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.5 }}
         onClick={() => setIsOpen(true)}
-        className={`fixed left-3 sm:left-4 z-50 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform ${
-          hasActiveOrders ? 'bottom-40' : 'bottom-6'
-        }`}
+        className="fixed right-3 sm:right-4 bottom-[45%] z-50 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-xl shadow-orange-500/40 flex items-center justify-center hover:scale-110 active:scale-95 transition-transform border-2 border-white/20"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
       >
