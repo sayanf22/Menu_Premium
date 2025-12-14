@@ -12,7 +12,7 @@ import {
   ShoppingCart, Plus, Minus, X, Search, Moon, Sun, Clock, 
   CheckCircle2, ArrowRight, Utensils, Sparkles, Salad, UtensilsCrossed, 
   Coffee, IceCream, Wine, Soup, Pizza, Sandwich, Flame, Leaf, Fish, Beef, Cookie,
-  Instagram, Facebook, Twitter, Globe, ChevronDown
+  Instagram, Facebook, Twitter, Globe, ChevronDown, Loader2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -163,6 +163,7 @@ const CustomerMenu = () => {
   const [serviceDisabled, setServiceDisabled] = useState(false);
   const [restaurantContact, setRestaurantContact] = useState<{ name: string; email: string; phone: string | null } | null>(null);
   const [imageLoaded, setImageLoaded] = useState<Record<string, boolean>>({});
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const feedbackDismissedRef = useRef(false); // Ref for realtime callback access
@@ -486,6 +487,9 @@ const CustomerMenu = () => {
 
 
   const placeOrder = async () => {
+    // Prevent duplicate orders - if already placing, ignore
+    if (isPlacingOrder) return;
+    
     if (!tableNumber || cart.length === 0) {
       toast({ title: "Missing information", description: "Please enter table number and add items", variant: "destructive" });
       return;
@@ -502,6 +506,9 @@ const CustomerMenu = () => {
       toast({ title: "Too many orders", description: "Please wait before placing another order", variant: "destructive" });
       return;
     }
+
+    // Set loading state to prevent multiple clicks
+    setIsPlacingOrder(true);
 
     try {
       const orderNum = `ORD${Date.now().toString().slice(-6)}`;
@@ -531,6 +538,9 @@ const CustomerMenu = () => {
       toast({ title: "🎉 Order placed!", description: `Order #${orderNum} is being prepared!`, duration: 5000 });
     } catch (err: any) {
       toast({ title: "Failed to create order", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      // Always reset loading state
+      setIsPlacingOrder(false);
     }
   };
 
@@ -1260,10 +1270,17 @@ const CustomerMenu = () => {
             </div>
             <Button 
               onClick={placeOrder} 
-              disabled={!tableNumber || cart.length === 0} 
+              disabled={!tableNumber || cart.length === 0 || isPlacingOrder} 
               className="w-full h-14 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 disabled:from-zinc-300 disabled:to-zinc-400 dark:disabled:from-zinc-700 dark:disabled:to-zinc-800 text-white rounded-xl font-bold text-lg shadow-lg shadow-red-500/20 disabled:shadow-none transition-all"
             >
-              Place Order • {formatINR(totalPrice)}
+              {isPlacingOrder ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Placing Order...
+                </span>
+              ) : (
+                `Place Order • ${formatINR(totalPrice)}`
+              )}
             </Button>
           </div>
         </DialogContent>
