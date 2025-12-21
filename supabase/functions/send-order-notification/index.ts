@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const ONESIGNAL_APP_ID = "30e2fbc2-8319-4e46-9cb3-2e9c24b2201c";
 const ONESIGNAL_REST_API_KEY = Deno.env.get("ONESIGNAL_REST_API_KEY");
@@ -8,7 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -18,7 +18,11 @@ serve(async (req) => {
     const { record } = await req.json();
 
     if (!record || !record.restaurant_id) {
-      throw new Error("Invalid order data");
+      console.log("Invalid order data received");
+      return new Response(JSON.stringify({ success: false, error: "Invalid order data" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Get restaurant details
@@ -39,10 +43,12 @@ serve(async (req) => {
     const restaurant = restaurants[0];
 
     if (!restaurant) {
-      throw new Error("Restaurant not found");
+      console.log("Restaurant not found:", record.restaurant_id);
+      return new Response(JSON.stringify({ success: false, error: "Restaurant not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
-
-    const restaurantName = restaurant.name || "Restaurant";
 
     // Calculate order total
     let orderTotal = 0;
@@ -53,11 +59,17 @@ serve(async (req) => {
       );
     }
 
+    // Check if OneSignal API key is configured
+    if (!ONESIGNAL_REST_API_KEY) {
+      console.log("OneSignal API key not configured - skipping push notification");
+      return new Response(JSON.stringify({ success: true, message: "Notification skipped - no API key" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Send OneSignal notification to restaurant owner using tags
-    // The restaurant owner's device is tagged with restaurant_id when they log in
     const notification = {
       app_id: ONESIGNAL_APP_ID,
-      // Target only devices tagged with this restaurant_id
       filters: [
         { field: "tag", key: "restaurant_id", relation: "=", value: record.restaurant_id },
       ],
@@ -72,29 +84,11 @@ serve(async (req) => {
         table_number: record.table_number,
         type: "new_order",
       },
-      // Chrome/Firefox specific settings
-      chrome_web_icon: "https://your-domain.com/icon-192.png",
-      chrome_web_badge: "https://your-domain.com/badge-72.png",
-      // iOS specific
-      ios_sound: "notification.wav",
-      // Android specific
-      android_sound: "notification",
-      android_channel_id: "orders",
-      // Priority settings
       priority: 10,
-      ttl: 3600, // 1 hour TTL
-      // Action buttons - URL should point to your app domain
-      // Note: Replace with your actual app URL in production
-      web_buttons: [
-        {
-          id: "view_order",
-          text: "View Order",
-          url: `${Deno.env.get("APP_URL") || "https://your-app-domain.com"}/dashboard#orders`,
-        },
-      ],
+      ttl: 3600,
     };
 
-    console.log("Sending notification:", JSON.stringify(notification, null, 2));
+    console.log("Sending notification for order:", record.order_number);
 
     const response = await fetch("https://onesignal.com/api/v1/notifications", {
       method: "POST",
@@ -106,10 +100,11 @@ serve(async (req) => {
     });
 
     const result = await response.json();
-    console.log("OneSignal response:", JSON.stringify(result, null, 2));
-
+    
     if (result.errors) {
       console.error("OneSignal errors:", result.errors);
+    } else {
+      console.log("Notification sent successfully for order:", record.order_number);
     }
 
     return new Response(JSON.stringify({ success: true, result }), {
@@ -117,7 +112,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error sending notification:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
