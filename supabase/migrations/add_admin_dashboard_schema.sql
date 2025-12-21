@@ -35,10 +35,10 @@ CREATE INDEX IF NOT EXISTS idx_admin_actions_log_timestamp ON admin_actions_log(
 CREATE INDEX IF NOT EXISTS idx_admin_actions_log_restaurant ON admin_actions_log(restaurant_id);
 
 -- Insert initial admin user
--- Email: sayanbanik66@gmail.com
--- Password: 8119811655
+-- IMPORTANT: Change this password immediately after setup via the admin dashboard
+-- This is a temporary placeholder password
 INSERT INTO admin_users (email, password_hash)
-VALUES ('sayanbanik66@gmail.com', crypt('8119811655', gen_salt('bf')))
+VALUES ('sayanbanik66@gmail.com', crypt('CHANGE_ME_IMMEDIATELY', gen_salt('bf')))
 ON CONFLICT (email) DO NOTHING;
 
 -- Create RPC function for password verification

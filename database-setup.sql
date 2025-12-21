@@ -477,12 +477,12 @@ USING (bucket_id = 'menu-images' AND auth.uid()::text = (storage.foldername(name
 -- =====================================================
 
 -- Insert default admin user
--- Email: sayanbanik66@gmail.com
--- Password: Qm9$kL7#pR2@nX4&vT8!wZ
+-- IMPORTANT: After running this script, immediately change the password via the admin dashboard
+-- Default password is set to a temporary value that should be changed
 INSERT INTO public.admin_users (email, password_hash)
 VALUES (
     'sayanbanik66@gmail.com',
-    crypt('Qm9$kL7#pR2@nX4&vT8!wZ', gen_salt('bf'))
+    crypt('CHANGE_ME_IMMEDIATELY', gen_salt('bf'))
 )
 ON CONFLICT (email) DO NOTHING;
 
@@ -500,8 +500,8 @@ ON CONFLICT (email) DO NOTHING;
 -- SELECT tablename FROM pg_publication_tables 
 -- WHERE pubname = 'supabase_realtime';
 
--- 3. Test admin login
--- SELECT verify_admin_password('sayanbanik66@gmail.com', 'Qm9$kL7#pR2@nX4&vT8!wZ');
+-- 3. Test admin login (use your actual password)
+-- SELECT verify_admin_password('sayanbanik66@gmail.com', 'your-password-here');
 
 -- =====================================================
 -- SETUP COMPLETE
