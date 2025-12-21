@@ -5,84 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Upload, X } from "lucide-react";
+import { 
+  Loader2, Save, Upload, X, Bell, BellOff, BellRing, 
+  Store, ImageIcon, FileText, CheckCircle2, AlertCircle
+} from "lucide-react";
 import { uploadToR2WithProgress, deleteFromR2, isR2Url } from "@/lib/r2Upload";
+import { motion } from "framer-motion";
 
 interface RestaurantProfileProps {
   restaurantId: string;
 }
-
-// CLIENT-SIDE IMAGE COMPRESSION
-// Compresses images on user's device before upload (no server load)
-const compressImageOnDevice = (file: File): Promise<File> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      const img = new Image();
-      
-      img.onload = () => {
-        // Calculate new dimensions (max 800px)
-        let width = img.width;
-        let height = img.height;
-        const MAX_DIMENSION = 800;
-        
-        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-          if (width > height) {
-            height = (height / width) * MAX_DIMENSION;
-            width = MAX_DIMENSION;
-          } else {
-            width = (width / height) * MAX_DIMENSION;
-            height = MAX_DIMENSION;
-          }
-        }
-        
-        // Create canvas and compress
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Could not get canvas context'));
-          return;
-        }
-        
-        // Draw image with high quality
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        // Convert to blob with 85% quality (good balance)
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Could not compress image'));
-              return;
-            }
-            
-            // Create new file from blob
-            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            
-            resolve(compressedFile);
-          },
-          'image/jpeg',
-          0.85 // 85% quality - excellent quality, good compression
-        );
-      };
-      
-      img.onerror = () => reject(new Error('Could not load image'));
-      img.src = e.target?.result as string;
-    };
-    
-    reader.onerror = () => reject(new Error('Could not read file'));
-    reader.readAsDataURL(file);
-  });
-};
 
 const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const { toast } = useToast();
@@ -93,10 +27,17 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null); // Track original for cleanup
+  const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null);
+  
+  // Notification states
+  const [notificationSupported, setNotificationSupported] = useState(false);
+  const [notificationSubscribed, setNotificationSubscribed] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const [isProductionDomain, setIsProductionDomain] = useState(false);
 
   useEffect(() => {
     fetchRestaurantData();
+    checkNotificationStatus();
   }, [restaurantId]);
 
   const fetchRestaurantData = async () => {
@@ -113,7 +54,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       setName(data.name || "");
       setDescription(data.description || "");
       setLogoUrl(data.logo_url || null);
-      setOriginalLogoUrl(data.logo_url || null); // Store original for cleanup
+      setOriginalLogoUrl(data.logo_url || null);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -125,45 +66,117 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
     }
   };
 
+  const checkNotificationStatus = async () => {
+    // Check if on production domain
+    const isProd = window.location.hostname === 'addmenu.site' || 
+                   window.location.hostname.endsWith('.addmenu.site');
+    setIsProductionDomain(isProd);
+    
+    // Check browser support
+    if (!("Notification" in window)) {
+      setNotificationSupported(false);
+      return;
+    }
+    setNotificationSupported(true);
+
+    // Check OneSignal status if on production
+    if (isProd && (window as any).OneSignalDeferred) {
+      (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
+        try {
+          const subscribed = await OneSignal.User.PushSubscription.optedIn;
+          setNotificationSubscribed(subscribed || false);
+        } catch (error) {
+          console.error("Error checking OneSignal status:", error);
+        }
+      });
+    }
+  };
+
+  const handleNotificationToggle = async (enabled: boolean) => {
+    if (!isProductionDomain) {
+      toast({
+        title: "Not available",
+        description: "Push notifications only work on addmenu.site",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!(window as any).OneSignalDeferred) {
+      toast({
+        title: "OneSignal not loaded",
+        description: "Please refresh the page and try again",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setNotificationLoading(true);
+
+    (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
+      try {
+        if (enabled) {
+          // Tag with restaurant_id first
+          await OneSignal.User.addTag("restaurant_id", restaurantId);
+          
+          // Request permission
+          const granted = await OneSignal.Notifications.requestPermission();
+          
+          if (granted) {
+            await OneSignal.User.PushSubscription.optIn();
+            setNotificationSubscribed(true);
+            toast({
+              title: "🔔 Notifications Enabled!",
+              description: "You'll receive alerts when new orders come in",
+            });
+          } else {
+            toast({
+              title: "Permission denied",
+              description: "Please enable notifications in browser settings",
+              variant: "destructive",
+            });
+          }
+        } else {
+          await OneSignal.User.PushSubscription.optOut();
+          setNotificationSubscribed(false);
+          toast({
+            title: "Notifications disabled",
+            description: "You won't receive push notifications",
+          });
+        }
+      } catch (error) {
+        console.error("Notification error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update notification settings",
+          variant: "destructive",
+        });
+      } finally {
+        setNotificationLoading(false);
+      }
+    });
+  };
+
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid file",
-          description: "Please upload an image file",
-          variant: "destructive",
-        });
+        toast({ title: "Invalid file", description: "Please upload an image", variant: "destructive" });
         return;
       }
 
-      // Validate file size before compression (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please upload an image smaller than 5MB",
-          variant: "destructive",
-        });
+        toast({ title: "File too large", description: "Max 5MB allowed", variant: "destructive" });
         return;
       }
 
       setUploading(true);
       
-      toast({
-        title: "Optimizing logo...",
-        description: "Compressing for best quality",
-      });
-
-      // CLIENT-SIDE COMPRESSION: Use optimized compression for logos
       const { compressImage } = await import("@/lib/imageOptimization");
-      const compressedFile = await compressImage(file, 'logo'); // Logo-specific compression
-      
-      console.log(`📦 Logo compressed: ${(file.size / 1024).toFixed(1)}KB → ${(compressedFile.size / 1024).toFixed(1)}KB`);
+      const compressedFile = await compressImage(file, 'logo');
 
-      // Upload to Cloudflare R2
       const result = await uploadToR2WithProgress(
         compressedFile,
         "restaurant-logos",
@@ -175,29 +188,18 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       }
 
       setLogoUrl(result.publicUrl);
-
-      toast({
-        title: "Success",
-        description: `Logo uploaded (${(compressedFile.size / 1024).toFixed(1)}KB). Don't forget to save!`,
-      });
+      toast({ title: "Logo uploaded!", description: "Don't forget to save" });
     } catch (error: any) {
-      console.error('Logo upload error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload logo",
-        variant: "destructive",
-      });
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
   const handleRemoveLogo = () => {
     setLogoUrl(null);
-    toast({
-      title: "Logo removed",
-      description: "Don't forget to save changes",
-    });
+    toast({ title: "Logo removed", description: "Save to confirm" });
   };
 
   const handleSave = async () => {
@@ -214,30 +216,14 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
       if (error) throw error;
 
-      // Delete old logo from R2 if it was changed or removed
       if (originalLogoUrl && originalLogoUrl !== logoUrl && isR2Url(originalLogoUrl)) {
-        deleteFromR2(originalLogoUrl).then(result => {
-          if (result.success) {
-            console.log("✅ Old logo deleted from R2:", originalLogoUrl);
-          } else {
-            console.warn("⚠️ Failed to delete old logo from R2:", result.error);
-          }
-        });
+        deleteFromR2(originalLogoUrl);
       }
 
-      // Update original URL to current
       setOriginalLogoUrl(logoUrl);
-
-      toast({
-        title: "Success",
-        description: "Restaurant profile updated successfully",
-      });
+      toast({ title: "Saved!", description: "Profile updated successfully" });
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to update restaurant profile",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to save", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -245,119 +231,253 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Restaurant Profile</CardTitle>
-        <CardDescription>
-          Update your restaurant name and description that customers will see when they scan your menu QR code
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Logo Upload Section */}
-        <div className="space-y-2">
-          <Label>Restaurant Logo</Label>
-          <div className="flex items-center gap-4">
-            {logoUrl ? (
+    <div className="space-y-4 md:space-y-6">
+      {/* Restaurant Info Card */}
+      <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 text-white pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <Store className="h-5 w-5 md:h-6 md:w-6" />
+            </div>
+            <div>
+              <CardTitle className="text-lg md:text-xl">Restaurant Profile</CardTitle>
+              <CardDescription className="text-white/80 text-sm">
+                Customize how customers see your restaurant
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 space-y-5 md:space-y-6">
+          {/* Logo Section */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="relative flex-shrink-0">
+              {logoUrl ? (
+                <div className="relative">
+                  <img 
+                    src={logoUrl} 
+                    alt="Logo" 
+                    className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-2xl border-2 border-zinc-200 dark:border-zinc-700"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg"
+                    onClick={handleRemoveLogo}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 md:w-24 md:h-24 bg-zinc-100 dark:bg-zinc-800 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center">
+                  <ImageIcon className="h-8 w-8 text-zinc-400" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 w-full">
+              <Label className="text-sm font-medium mb-2 block">Restaurant Logo</Label>
               <div className="relative">
-                <img 
-                  src={logoUrl} 
-                  alt="Restaurant logo" 
-                  className="w-24 h-24 object-cover rounded-lg border-2 border-border"
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  disabled={uploading}
+                  className="cursor-pointer text-sm"
                 />
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                  onClick={handleRemoveLogo}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
               </div>
-            ) : (
-              <div className="w-24 h-24 bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-              </div>
-            )}
-            <div className="flex-1">
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={handleLogoUpload}
-                disabled={uploading}
-                className="cursor-pointer"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Upload a square logo (max 200KB). Recommended: 512x512px PNG or JPG.
-              </p>
               {uploading && (
-                <div className="mt-2 space-y-1">
-                  <p className="text-xs text-primary flex items-center gap-1">
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 text-xs text-primary">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     Uploading... {uploadProgress}%
-                  </p>
-                  <div className="w-full bg-muted rounded-full h-1.5">
+                  </div>
+                  <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 mt-1">
                     <div 
-                      className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                      className="bg-primary h-1.5 rounded-full transition-all"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
                 </div>
               )}
+              <p className="text-xs text-zinc-500 mt-1">Square image, max 5MB</p>
             </div>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="name">Restaurant Name</Label>
-          <Input
-            id="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Enter restaurant name"
-            maxLength={100}
-          />
-        </div>
+          {/* Name Input */}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm font-medium">Restaurant Name</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your restaurant name"
+              maxLength={100}
+              className="h-11 md:h-12 rounded-xl"
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Enter a brief description of your restaurant (e.g., cuisine type, specialties, ambiance)"
-            rows={5}
-            maxLength={500}
-            className="resize-none"
-          />
-          <p className="text-sm text-muted-foreground">
-            {description.length}/500 characters
-          </p>
-        </div>
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe your restaurant, cuisine type, specialties..."
+              rows={4}
+              maxLength={500}
+              className="resize-none rounded-xl"
+            />
+            <p className="text-xs text-zinc-500 text-right">{description.length}/500</p>
+          </div>
 
-        <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </>
+          {/* Save Button */}
+          <Button 
+            onClick={handleSave} 
+            disabled={saving} 
+            className="w-full h-11 md:h-12 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Push Notifications Card */}
+      <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
+        <CardHeader className="pb-3 md:pb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center ${
+              notificationSubscribed 
+                ? 'bg-green-100 dark:bg-green-900/30' 
+                : 'bg-zinc-100 dark:bg-zinc-800'
+            }`}>
+              {notificationSubscribed ? (
+                <BellRing className="h-5 w-5 md:h-6 md:w-6 text-green-600 dark:text-green-400" />
+              ) : (
+                <Bell className="h-5 w-5 md:h-6 md:w-6 text-zinc-500" />
+              )}
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-base md:text-lg">Push Notifications</CardTitle>
+              <CardDescription className="text-sm">
+                Get instant alerts for new orders
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+          {/* Status Banner */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-3 md:p-4 rounded-xl ${
+              notificationSubscribed 
+                ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' 
+                : 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {notificationSubscribed ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200 text-sm md:text-base">Notifications Active</p>
+                    <p className="text-xs md:text-sm text-green-600 dark:text-green-400">You'll receive order alerts</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-amber-800 dark:text-amber-200 text-sm md:text-base">Notifications Off</p>
+                    <p className="text-xs md:text-sm text-amber-600 dark:text-amber-400">Enable to get instant alerts</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Toggle Switch */}
+          <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+            <div className="flex items-center gap-3">
+              <Bell className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-sm md:text-base">Order Notifications</p>
+                <p className="text-xs md:text-sm text-zinc-500">Alerts when customers order</p>
+              </div>
+            </div>
+            <Switch
+              checked={notificationSubscribed}
+              onCheckedChange={handleNotificationToggle}
+              disabled={notificationLoading || !notificationSupported}
+            />
+          </div>
+
+          {/* Not on production domain warning */}
+          {!isProductionDomain && (
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs md:text-sm text-blue-700 dark:text-blue-300">
+                  Push notifications are only available on <strong>addmenu.site</strong>. 
+                  Deploy your app to enable this feature.
+                </p>
+              </div>
+            </div>
           )}
-        </Button>
-      </CardContent>
-    </Card>
+
+          {/* Browser not supported warning */}
+          {!notificationSupported && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+              <div className="flex items-start gap-2">
+                <BellOff className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs md:text-sm text-red-700 dark:text-red-300">
+                  Your browser doesn't support push notifications. Try Chrome, Firefox, or Edge.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* How it works - Collapsible on mobile */}
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              <span className="font-medium text-sm">How notifications work</span>
+              <span className="text-zinc-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="mt-3 space-y-3 pl-2">
+              {[
+                { step: "1", text: "Customer places an order via QR menu" },
+                { step: "2", text: "You get instant push notification" },
+                { step: "3", text: "Tap to view order details in dashboard" },
+              ].map((item) => (
+                <div key={item.step} className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-orange-600">{item.step}</span>
+                  </div>
+                  <p className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </details>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
