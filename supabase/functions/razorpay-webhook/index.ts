@@ -125,6 +125,7 @@ async function handleSubscriptionActivated(supabase: any, payload: any) {
     .from("user_subscriptions")
     .update({
       status: "active",
+      cancelled_at: null, // Clear cancelled_at when subscription is activated
       current_period_start: subscription?.current_start
         ? new Date(subscription.current_start * 1000).toISOString()
         : now.toISOString(),
@@ -164,12 +165,14 @@ async function handleSubscriptionCharged(supabase: any, payload: any) {
       payment_method: payment.method,
     });
 
-    // Update period end
+    // Update period end and ensure subscription is active (payment = active subscription)
     const subscription = payload.payload?.subscription?.entity;
     if (subscription?.current_end) {
       await supabase
         .from("user_subscriptions")
         .update({
+          status: "active", // Ensure status is active when payment is successful
+          cancelled_at: null, // Clear cancelled_at - payment means subscription is active
           current_period_end: new Date(subscription.current_end * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         })
