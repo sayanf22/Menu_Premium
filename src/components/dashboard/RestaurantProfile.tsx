@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, Save, Upload, X, Bell, BellOff, BellRing, 
-  Store, ImageIcon, FileText, CheckCircle2, AlertCircle
+  Store, ImageIcon, CheckCircle2, AlertCircle
 } from "lucide-react";
 import { uploadToR2WithProgress, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 import { motion } from "framer-motion";
@@ -30,14 +30,15 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null);
   
   // Notification states
-  const [notificationSupported, setNotificationSupported] = useState(false);
+  const [notificationSupported, setNotificationSupported] = useState(true);
   const [notificationSubscribed, setNotificationSubscribed] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [isProductionDomain, setIsProductionDomain] = useState(false);
+  const [oneSignalReady, setOneSignalReady] = useState(false);
 
   useEffect(() => {
     fetchRestaurantData();
-    checkNotificationStatus();
+    initializeNotifications();
   }, [restaurantId]);
 
   const fetchRestaurantData = async () => {
@@ -66,7 +67,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
     }
   };
 
-  const checkNotificationStatus = async () => {
+  const initializeNotifications = async () => {
     // Check if on production domain
     const isProd = window.location.hostname === 'addmenu.site' || 
                    window.location.hostname.endsWith('.addmenu.site');
@@ -77,25 +78,39 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       setNotificationSupported(false);
       return;
     }
-    setNotificationSupported(true);
 
-    // Check OneSignal status if on production
+    // Wait for OneSignal to be ready
     if (isProd && (window as any).OneSignalDeferred) {
-      (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
-        try {
-          const subscribed = await OneSignal.User.PushSubscription.optedIn;
-          setNotificationSubscribed(subscribed || false);
-        } catch (error) {
-          console.error("Error checking OneSignal status:", error);
-        }
-      });
+      try {
+        await new Promise<void>((resolve) => {
+          (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
+            try {
+              setOneSignalReady(true);
+              
+              // Check current subscription status
+              const subscribed = await OneSignal.User.PushSubscription.optedIn;
+              setNotificationSubscribed(subscribed === true);
+              
+              // Tag with restaurant_id
+              if (restaurantId) {
+                await OneSignal.User.addTag("restaurant_id", restaurantId);
+              }
+            } catch (error) {
+              console.error("OneSignal init error:", error);
+            }
+            resolve();
+          });
+        });
+      } catch (error) {
+        console.error("OneSignal setup error:", error);
+      }
     }
   };
 
   const handleNotificationToggle = async (enabled: boolean) => {
     if (!isProductionDomain) {
       toast({
-        title: "Not available",
+        title: "Not available here",
         description: "Push notifications only work on addmenu.site",
         variant: "destructive",
       });
@@ -104,8 +119,8 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
     if (!(window as any).OneSignalDeferred) {
       toast({
-        title: "OneSignal not loaded",
-        description: "Please refresh the page and try again",
+        title: "Please refresh",
+        description: "OneSignal is not loaded. Refresh the page.",
         variant: "destructive",
       });
       return;
@@ -113,48 +128,60 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
     setNotificationLoading(true);
 
-    (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
-      try {
-        if (enabled) {
-          // Tag with restaurant_id first
-          await OneSignal.User.addTag("restaurant_id", restaurantId);
-          
-          // Request permission
-          const granted = await OneSignal.Notifications.requestPermission();
-          
-          if (granted) {
-            await OneSignal.User.PushSubscription.optIn();
-            setNotificationSubscribed(true);
-            toast({
-              title: "🔔 Notifications Enabled!",
-              description: "You'll receive alerts when new orders come in",
-            });
-          } else {
-            toast({
-              title: "Permission denied",
-              description: "Please enable notifications in browser settings",
-              variant: "destructive",
-            });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        (window as any).OneSignalDeferred.push(async function (OneSignal: any) {
+          try {
+            if (enabled) {
+              // Tag with restaurant_id first
+              await OneSignal.User.addTag("restaurant_id", restaurantId);
+              console.log("Tagged with restaurant_id:", restaurantId);
+              
+              // Request permission using the slidedown prompt
+              const permission = await OneSignal.Notifications.requestPermission();
+              console.log("Permission result:", permission);
+              
+              if (permission) {
+                // Opt in to push notifications
+                await OneSignal.User.PushSubscription.optIn();
+                setNotificationSubscribed(true);
+                toast({
+                  title: "🔔 Notifications Enabled!",
+                  description: "You'll receive alerts when new orders come in",
+                });
+              } else {
+                toast({
+                  title: "Permission denied",
+                  description: "Please allow notifications in your browser settings",
+                  variant: "destructive",
+                });
+              }
+            } else {
+              // Opt out of push notifications
+              await OneSignal.User.PushSubscription.optOut();
+              setNotificationSubscribed(false);
+              toast({
+                title: "Notifications disabled",
+                description: "You won't receive push notifications",
+              });
+            }
+            resolve();
+          } catch (error) {
+            console.error("Notification toggle error:", error);
+            reject(error);
           }
-        } else {
-          await OneSignal.User.PushSubscription.optOut();
-          setNotificationSubscribed(false);
-          toast({
-            title: "Notifications disabled",
-            description: "You won't receive push notifications",
-          });
-        }
-      } catch (error) {
-        console.error("Notification error:", error);
-        toast({
-          title: "Error",
-          description: "Failed to update notification settings",
-          variant: "destructive",
         });
-      } finally {
-        setNotificationLoading(false);
-      }
-    });
+      });
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update notification settings. Try refreshing.",
+        variant: "destructive",
+      });
+    } finally {
+      setNotificationLoading(false);
+    }
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,7 +248,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       }
 
       setOriginalLogoUrl(logoUrl);
-      toast({ title: "Saved!", description: "Profile updated successfully" });
+      toast({ title: "Saved!", description: "Settings updated successfully" });
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to save", variant: "destructive" });
     } finally {
@@ -247,7 +274,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
               <Store className="h-5 w-5 md:h-6 md:w-6" />
             </div>
             <div>
-              <CardTitle className="text-lg md:text-xl">Restaurant Profile</CardTitle>
+              <CardTitle className="text-lg md:text-xl">Restaurant Settings</CardTitle>
               <CardDescription className="text-white/80 text-sm">
                 Customize how customers see your restaurant
               </CardDescription>
@@ -397,16 +424,16 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
                 <>
                   <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-green-800 dark:text-green-200 text-sm md:text-base">Notifications Active</p>
-                    <p className="text-xs md:text-sm text-green-600 dark:text-green-400">You'll receive order alerts</p>
+                    <p className="font-medium text-green-800 dark:text-green-200 text-sm md:text-base">Push Notifications Active</p>
+                    <p className="text-xs md:text-sm text-green-600 dark:text-green-400">You'll receive order alerts on this device</p>
                   </div>
                 </>
               ) : (
                 <>
                   <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-amber-800 dark:text-amber-200 text-sm md:text-base">Notifications Off</p>
-                    <p className="text-xs md:text-sm text-amber-600 dark:text-amber-400">Enable to get instant alerts</p>
+                    <p className="font-medium text-amber-800 dark:text-amber-200 text-sm md:text-base">Push Notifications Off</p>
+                    <p className="text-xs md:text-sm text-amber-600 dark:text-amber-400">Enable to get instant order alerts</p>
                   </div>
                 </>
               )}
@@ -414,20 +441,47 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
           </motion.div>
 
           {/* Toggle Switch */}
-          <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-            <div className="flex items-center gap-3">
-              <Bell className="h-5 w-5 text-zinc-500 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-sm md:text-base">Order Notifications</p>
-                <p className="text-xs md:text-sm text-zinc-500">Alerts when customers order</p>
+          {isProductionDomain && notificationSupported && (
+            <div className="flex items-center justify-between p-3 md:p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-zinc-500 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-sm md:text-base">Order Push Notifications</p>
+                  <p className="text-xs md:text-sm text-zinc-500">Browser push alerts for new orders</p>
+                </div>
               </div>
+              {notificationLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              ) : (
+                <Switch
+                  checked={notificationSubscribed}
+                  onCheckedChange={handleNotificationToggle}
+                  disabled={notificationLoading}
+                />
+              )}
             </div>
-            <Switch
-              checked={notificationSubscribed}
-              onCheckedChange={handleNotificationToggle}
-              disabled={notificationLoading || !notificationSupported}
-            />
-          </div>
+          )}
+
+          {/* Enable Button for easier access */}
+          {isProductionDomain && notificationSupported && !notificationSubscribed && (
+            <Button 
+              onClick={() => handleNotificationToggle(true)}
+              disabled={notificationLoading}
+              className="w-full h-11 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+            >
+              {notificationLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enabling...
+                </>
+              ) : (
+                <>
+                  <Bell className="h-4 w-4 mr-2" />
+                  Enable Push Notifications
+                </>
+              )}
+            </Button>
+          )}
 
           {/* Not on production domain warning */}
           {!isProductionDomain && (
@@ -436,7 +490,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
                 <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <p className="text-xs md:text-sm text-blue-700 dark:text-blue-300">
                   Push notifications are only available on <strong>addmenu.site</strong>. 
-                  Deploy your app to enable this feature.
+                  You're currently on {window.location.hostname}.
                 </p>
               </div>
             </div>
@@ -454,17 +508,17 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
             </div>
           )}
 
-          {/* How it works - Collapsible on mobile */}
+          {/* How it works - Collapsible */}
           <details className="group">
             <summary className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-              <span className="font-medium text-sm">How notifications work</span>
+              <span className="font-medium text-sm">How push notifications work</span>
               <span className="text-zinc-400 group-open:rotate-180 transition-transform">▼</span>
             </summary>
             <div className="mt-3 space-y-3 pl-2">
               {[
                 { step: "1", text: "Customer places an order via QR menu" },
-                { step: "2", text: "You get instant push notification" },
-                { step: "3", text: "Tap to view order details in dashboard" },
+                { step: "2", text: "You get instant push notification on this device" },
+                { step: "3", text: "Tap notification to view order in dashboard" },
               ].map((item) => (
                 <div key={item.step} className="flex items-center gap-3">
                   <div className="w-6 h-6 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
@@ -475,6 +529,11 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
               ))}
             </div>
           </details>
+
+          {/* Note about in-app notifications */}
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
+            💡 In-app order notifications always work. Push notifications are for when you're not on the dashboard.
+          </p>
         </CardContent>
       </Card>
     </div>
