@@ -1051,7 +1051,6 @@ const CustomerMenu = () => {
       <ServiceCallButton 
         restaurantId={restaurantId || ""} 
         tableNumber={tableNumber} 
-        hasActiveOrders={activeOrders.length > 0}
       />
 
       {/* Floating Order History Button - Mobile Optimized */}

@@ -10,7 +10,6 @@ interface ServiceCallButtonProps {
   restaurantId: string;
   tableNumber?: string;
   disabled?: boolean;
-  hasActiveOrders?: boolean;
 }
 
 const SERVICE_OPTIONS = [
@@ -21,7 +20,7 @@ const SERVICE_OPTIONS = [
 
 type CallType = typeof SERVICE_OPTIONS[number]["type"];
 
-const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disabled, hasActiveOrders = false }: ServiceCallButtonProps) => {
+const ServiceCallButton = ({ restaurantId, tableNumber: propTableNumber, disabled }: ServiceCallButtonProps) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState<CallType | null>(null);
