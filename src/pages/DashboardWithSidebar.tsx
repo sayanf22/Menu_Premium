@@ -14,7 +14,8 @@ import {
   BarChart3, 
   Share2, 
   Settings, 
-  Bell, 
+  Bell,
+  BellRing,
   X,
   User,
   FileText,
@@ -34,6 +35,7 @@ import SocialLinksForm from "@/components/dashboard/SocialLinksForm";
 import RestaurantProfile from "@/components/dashboard/RestaurantProfile";
 import SubscriptionManagement from "@/components/dashboard/SubscriptionManagement";
 import ServiceCallsPanel from "@/components/dashboard/ServiceCallsPanel";
+import NotificationSettings from "@/components/dashboard/NotificationSettings";
 import { useSubscription } from "@/hooks/useSubscription";
 
 interface Order {
@@ -145,6 +147,12 @@ const DashboardWithSidebar = () => {
       href: "#qr",
       icon: <QrCode className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
       onClick: () => handleTabChange("qr"),
+    },
+    {
+      label: "Notifications",
+      href: "#notifications",
+      icon: <BellRing className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      onClick: () => handleTabChange("notifications"),
     },
     {
       label: "Subscription",
@@ -1036,6 +1044,7 @@ const Dashboard = ({
         {activeTab === "service-calls" && <ServiceCallsPanel restaurantId={restaurantId} onNewCall={(call) => onNewServiceCall(call as ServiceCall)} />}
         {activeTab === "social" && <SocialLinksForm restaurantId={restaurantId} />}
         {activeTab === "qr" && <QRCodeDisplay restaurantId={restaurantId} />}
+        {activeTab === "notifications" && <NotificationSettings restaurantId={restaurantId} />}
         {activeTab === "subscription" && <SubscriptionManagement />}
         {activeTab === "profile" && <RestaurantProfile restaurantId={restaurantId} />}
       </div>
