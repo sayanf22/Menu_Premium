@@ -507,20 +507,64 @@ const CustomerMenu = () => {
       return;
     }
 
+    // Check network connectivity before placing order
+    if (!navigator.onLine) {
+      toast({ title: "No internet connection", description: "Please check your connection and try again", variant: "destructive" });
+      return;
+    }
+
     // Set loading state to prevent multiple clicks
     setIsPlacingOrder(true);
 
     try {
       const orderNum = `ORD${Date.now().toString().slice(-6)}`;
       const orderItems = cart.map(item => ({ id: item.id, name: item.name, price: item.price, quantity: item.quantity || 1, image_url: item.image_url }));
-      const { data: newOrder, error } = await supabase
+      
+      // Add timeout to prevent hanging requests
+      const orderPromise = supabase
         .from("orders")
         .insert([{ restaurant_id: restaurantId, table_number: tableNumber, items: { items: orderItems }, order_number: orderNum, status: 'preparing' }])
         .select()
         .single();
 
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Order request timed out')), 15000)
+      );
+
+      const { data: newOrder, error } = await Promise.race([orderPromise, timeoutPromise]) as any;
+
       if (error) throw new Error(error.message);
       if (!newOrder) throw new Error('No order data returned');
+
+      // Send notification to restaurant owner (client-side call for reliability)
+      try {
+        const notificationPromise = supabase.functions.invoke('send-order-notification', {
+          body: { record: newOrder }
+        });
+        
+        const notificationTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Notification timeout')), 10000)
+        );
+
+        const { error: notificationError } = await Promise.race([notificationPromise, notificationTimeout]) as any;
+        
+        if (notificationError) {
+          console.warn('Notification failed:', notificationError);
+          // Retry once after a short delay
+          setTimeout(async () => {
+            try {
+              await supabase.functions.invoke('send-order-notification', {
+                body: { record: newOrder }
+              });
+            } catch (retryErr) {
+              console.warn('Notification retry failed:', retryErr);
+            }
+          }, 2000);
+        }
+      } catch (notifErr) {
+        console.warn('Notification error:', notifErr);
+        // Don't fail the order if notification fails
+      }
 
       setActiveOrders(prev => [...prev, newOrder]);
       setCurrentOrder(newOrder);
@@ -537,7 +581,14 @@ const CustomerMenu = () => {
       setShowOrderConfirmation(true);
       toast({ title: "🎉 Order placed!", description: `Order #${orderNum} is being prepared!`, duration: 5000 });
     } catch (err: any) {
-      toast({ title: "Failed to create order", description: err.message || "Please try again.", variant: "destructive" });
+      console.error('Order placement error:', err);
+      toast({ 
+        title: "Failed to create order", 
+        description: err.message === 'Order request timed out' 
+          ? "Request timed out. Please check your connection and try again." 
+          : err.message || "Please try again.", 
+        variant: "destructive" 
+      });
     } finally {
       // Always reset loading state
       setIsPlacingOrder(false);
