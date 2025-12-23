@@ -560,7 +560,7 @@ const CustomerMenu = () => {
       // Add timeout to prevent hanging requests
       const orderPromise = supabase
         .from("orders")
-        .insert([{ restaurant_id: restaurantId, table_number: tableNumber, items: { items: orderItems }, order_number: orderNum, status: 'preparing' }])
+        .insert([{ restaurant_id: restaurantId, table_number: tableNumber, items: { items: orderItems }, order_number: orderNum, status: 'preparing', session_id: sessionId }])
         .select()
         .single();
 

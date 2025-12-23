@@ -290,6 +290,7 @@ export type Database = {
           items: Json
           order_number: string
           restaurant_id: string
+          session_id: string | null
           status: string
           table_number: string
           updated_at: string
@@ -300,6 +301,7 @@ export type Database = {
           items: Json
           order_number: string
           restaurant_id: string
+          session_id?: string | null
           status?: string
           table_number: string
           updated_at?: string
@@ -310,6 +312,7 @@ export type Database = {
           items?: Json
           order_number?: string
           restaurant_id?: string
+          session_id?: string | null
           status?: string
           table_number?: string
           updated_at?: string

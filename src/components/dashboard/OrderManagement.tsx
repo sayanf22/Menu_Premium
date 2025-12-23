@@ -18,9 +18,11 @@ interface Order {
   items: any;
   status: string;
   created_at: string;
+  session_id: string | null;
 }
 
-interface TableGroup {
+interface SessionGroup {
+  sessionId: string;
   tableNumber: string;
   orders: Order[];
   totalItems: number;
@@ -46,7 +48,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
+  const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -72,8 +74,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
         if (exists) return currentOrders;
         
         setNewOrderIds(prev => new Set(prev).add(newOrderTrigger.id));
-        // Auto-expand the table group for new orders
-        setExpandedTables(prev => new Set(prev).add(newOrderTrigger.table_number));
+        // Auto-expand the session group for new orders
+        const sessionKey = newOrderTrigger.session_id || `table_${newOrderTrigger.table_number}_${newOrderTrigger.id}`;
+        setExpandedSessions(prev => new Set(prev).add(sessionKey));
         
         setTimeout(() => {
           setNewOrderIds(prev => {
@@ -165,10 +168,10 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
     }
   };
 
-  // Group orders by table within 90-minute window
-  const tableGroups = useMemo((): TableGroup[] => {
+  // Group orders by session_id (same customer) within 90-minute window
+  const sessionGroups = useMemo((): SessionGroup[] => {
     const now = Date.now();
-    const groups: Map<string, TableGroup> = new Map();
+    const groups: Map<string, SessionGroup> = new Map();
 
     // Filter orders within the grouping window (90 mins) or still active
     const relevantOrders = orders.filter(order => {
@@ -179,10 +182,12 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
     });
 
     relevantOrders.forEach(order => {
-      const tableKey = order.table_number;
+      // Use session_id if available, otherwise create a unique key per order (no grouping for legacy orders)
+      const sessionKey = order.session_id || `legacy_${order.id}`;
       
-      if (!groups.has(tableKey)) {
-        groups.set(tableKey, {
+      if (!groups.has(sessionKey)) {
+        groups.set(sessionKey, {
+          sessionId: sessionKey,
           tableNumber: order.table_number,
           orders: [],
           totalItems: 0,
@@ -195,7 +200,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
         });
       }
 
-      const group = groups.get(tableKey)!;
+      const group = groups.get(sessionKey)!;
       group.orders.push(order);
       
       // Track new orders
@@ -237,7 +242,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
       });
     });
 
-    // Sort groups: active tables first, then by latest order time
+    // Sort groups: active sessions first, then by latest order time
     return Array.from(groups.values()).sort((a, b) => {
       if (a.allCompleted !== b.allCompleted) {
         return a.allCompleted ? 1 : -1;
@@ -246,13 +251,13 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
     });
   }, [orders, newOrderIds]);
 
-  const toggleTableExpand = (tableNumber: string) => {
-    setExpandedTables(prev => {
+  const toggleSessionExpand = (sessionId: string) => {
+    setExpandedSessions(prev => {
       const updated = new Set(prev);
-      if (updated.has(tableNumber)) {
-        updated.delete(tableNumber);
+      if (updated.has(sessionId)) {
+        updated.delete(sessionId);
       } else {
-        updated.add(tableNumber);
+        updated.add(sessionId);
       }
       return updated;
     });
@@ -288,7 +293,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
   // Stats
   const activeOrdersCount = orders.filter(o => o.status !== 'completed').length;
-  const activeTables = tableGroups.filter(g => !g.allCompleted).length;
+  const activeSessions = sessionGroups.filter(g => !g.allCompleted).length;
 
   return (
     <div className="space-y-6">
@@ -330,8 +335,8 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{activeTables}</p>
-              <p className="text-xs text-muted-foreground">Active Tables</p>
+              <p className="text-2xl font-bold">{activeSessions}</p>
+              <p className="text-xs text-muted-foreground">Active Sessions</p>
             </div>
           </div>
         </Card>
@@ -352,22 +357,22 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               <ShoppingBag className="h-5 w-5 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{tableGroups.reduce((sum, g) => sum + g.totalItems, 0)}</p>
+              <p className="text-2xl font-bold">{sessionGroups.reduce((sum, g) => sum + g.totalItems, 0)}</p>
               <p className="text-xs text-muted-foreground">Total Items</p>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Table Groups */}
+      {/* Session Groups */}
       <div className="space-y-4">
         <AnimatePresence mode="popLayout">
-          {tableGroups.map((group) => {
-            const isExpanded = expandedTables.has(group.tableNumber);
+          {sessionGroups.map((group) => {
+            const isExpanded = expandedSessions.has(group.sessionId);
             
             return (
               <motion.div
-                key={group.tableNumber}
+                key={group.sessionId}
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -381,9 +386,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                       ? 'ring-2 ring-orange-500/50 shadow-lg shadow-orange-500/10' 
                       : 'hover:shadow-md'
                 }`}>
-                  {/* Table Header - Clickable */}
+                  {/* Session Header - Clickable */}
                   <button
-                    onClick={() => toggleTableExpand(group.tableNumber)}
+                    onClick={() => toggleSessionExpand(group.sessionId)}
                     className="w-full p-4 md:p-5 flex items-center justify-between gap-4 hover:bg-muted/50 transition-colors text-left"
                   >
                     <div className="flex items-center gap-4">
@@ -586,7 +591,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
       </div>
 
       {/* Empty State */}
-      {tableGroups.length === 0 && (
+      {sessionGroups.length === 0 && (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
             <Package className="h-8 w-8 text-muted-foreground" />
