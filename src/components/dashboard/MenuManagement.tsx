@@ -22,6 +22,13 @@ interface MenuItem {
   image_url: string;
   is_available: boolean;
   category_id: string | null;
+  has_size_variants: boolean;
+  size_variants: { name: string; price: number }[];
+}
+
+interface SizeVariant {
+  name: string;
+  price: number;
 }
 
 interface MenuCategory {
@@ -51,6 +58,11 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
     description: "",
     price: "",
     category_id: "",
+    has_size_variants: false,
+    size_variants: [
+      { name: "Half", price: "" },
+      { name: "Full", price: "" }
+    ] as { name: string; price: string }[],
   });
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -247,6 +259,13 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
         imageUrl = await uploadImage(imageFile);
       }
 
+      // Process size variants - filter out empty prices and convert to numbers
+      const processedSizeVariants = formData.has_size_variants
+        ? formData.size_variants
+            .filter(v => v.name.trim() && v.price.trim())
+            .map(v => ({ name: v.name.trim(), price: parseFloat(v.price) }))
+        : [];
+
       const itemData = {
         restaurant_id: restaurantId,
         name: formData.name,
@@ -255,6 +274,8 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
         image_url: imageUrl,
         is_available: true,
         category_id: formData.category_id || null,
+        has_size_variants: formData.has_size_variants,
+        size_variants: processedSizeVariants,
       };
 
       if (editingItem) {
@@ -361,7 +382,17 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "", category_id: "" });
+    setFormData({ 
+      name: "", 
+      description: "", 
+      price: "", 
+      category_id: "",
+      has_size_variants: false,
+      size_variants: [
+        { name: "Half", price: "" },
+        { name: "Full", price: "" }
+      ],
+    });
     setImageFile(null);
     setImagePreview("");
     setEditingItem(null);
@@ -374,6 +405,13 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
       description: item.description,
       price: item.price.toString(),
       category_id: item.category_id || "",
+      has_size_variants: item.has_size_variants || false,
+      size_variants: item.has_size_variants && item.size_variants?.length > 0
+        ? item.size_variants.map(v => ({ name: v.name, price: v.price.toString() }))
+        : [
+            { name: "Half", price: "" },
+            { name: "Full", price: "" }
+          ],
     });
     setImagePreview(item.image_url);
     setDialogOpen(true);
@@ -530,6 +568,90 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Size Variants Section */}
+              <div className="space-y-3 p-4 rounded-xl bg-muted/50 border">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="size-variants" className="text-sm font-medium">Size Options</Label>
+                    <p className="text-xs text-muted-foreground">Enable Half/Full or custom size pricing</p>
+                  </div>
+                  <Switch
+                    id="size-variants"
+                    checked={formData.has_size_variants}
+                    onCheckedChange={(checked) => setFormData({ ...formData, has_size_variants: checked })}
+                  />
+                </div>
+                
+                {formData.has_size_variants && (
+                  <div className="space-y-3 pt-3 border-t">
+                    {formData.size_variants.map((variant, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="Size name (e.g., Half)"
+                            value={variant.name}
+                            onChange={(e) => {
+                              const newVariants = [...formData.size_variants];
+                              newVariants[index].name = e.target.value;
+                              setFormData({ ...formData, size_variants: newVariants });
+                            }}
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="w-28">
+                          <Input
+                            type="number"
+                            placeholder="Price"
+                            value={variant.price}
+                            onChange={(e) => {
+                              const newVariants = [...formData.size_variants];
+                              newVariants[index].price = e.target.value;
+                              setFormData({ ...formData, size_variants: newVariants });
+                            }}
+                            className="h-9"
+                          />
+                        </div>
+                        {formData.size_variants.length > 2 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              const newVariants = formData.size_variants.filter((_, i) => i !== index);
+                              setFormData({ ...formData, size_variants: newVariants });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {formData.size_variants.length < 5 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            size_variants: [...formData.size_variants, { name: "", price: "" }]
+                          });
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Size Option
+                      </Button>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      💡 When size options are enabled, customers will choose a size before adding to cart.
+                      The base price above will be used as default if no size is selected.
+                    </p>
+                  </div>
+                )}
+              </div>
               {isUploading && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -602,18 +724,38 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />
-                    <div className={`absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-semibold ${
-                      item.is_available 
-                        ? "bg-accent text-accent-foreground" 
-                        : "bg-destructive text-destructive-foreground"
-                    }`}>
-                      {item.is_available ? "Available" : "Unavailable"}
+                    <div className="absolute top-2 right-2 flex gap-1.5">
+                      {item.has_size_variants && (
+                        <div className="px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-500 text-white">
+                          Sizes
+                        </div>
+                      )}
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        item.is_available 
+                          ? "bg-accent text-accent-foreground" 
+                          : "bg-destructive text-destructive-foreground"
+                      }`}>
+                        {item.is_available ? "Available" : "Unavailable"}
+                      </div>
                     </div>
                   </div>
                   <CardHeader>
                     <CardTitle className="flex justify-between items-start">
                       <span>{item.name}</span>
-                      <span className="text-primary">₹{item.price.toFixed(2)}</span>
+                      <div className="text-right">
+                        {item.has_size_variants && item.size_variants?.length > 0 ? (
+                          <div className="flex flex-col items-end gap-0.5">
+                            {item.size_variants.map((v, i) => (
+                              <span key={i} className="text-sm">
+                                <span className="text-muted-foreground">{v.name}:</span>{" "}
+                                <span className="text-primary font-semibold">₹{v.price}</span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-primary">₹{item.price.toFixed(2)}</span>
+                        )}
+                      </div>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -663,18 +805,38 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
                     alt={item.name}
                     className="w-full h-full object-cover"
                   />
-                  <div className={`absolute top-2 right-2 px-3 py-1 rounded-full text-xs font-semibold ${
-                    item.is_available 
-                      ? "bg-accent text-accent-foreground" 
-                      : "bg-destructive text-destructive-foreground"
-                  }`}>
-                    {item.is_available ? "Available" : "Unavailable"}
+                  <div className="absolute top-2 right-2 flex gap-1.5">
+                    {item.has_size_variants && (
+                      <div className="px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-500 text-white">
+                        Sizes
+                      </div>
+                    )}
+                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      item.is_available 
+                        ? "bg-accent text-accent-foreground" 
+                        : "bg-destructive text-destructive-foreground"
+                    }`}>
+                      {item.is_available ? "Available" : "Unavailable"}
+                    </div>
                   </div>
                 </div>
                 <CardHeader>
                   <CardTitle className="flex justify-between items-start">
                     <span>{item.name}</span>
-                    <span className="text-primary">₹{item.price.toFixed(2)}</span>
+                    <div className="text-right">
+                      {item.has_size_variants && item.size_variants?.length > 0 ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          {item.size_variants.map((v, i) => (
+                            <span key={i} className="text-sm">
+                              <span className="text-muted-foreground">{v.name}:</span>{" "}
+                              <span className="text-primary font-semibold">₹{v.price}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-primary">₹{item.price.toFixed(2)}</span>
+                      )}
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">

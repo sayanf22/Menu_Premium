@@ -302,10 +302,20 @@ const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible 
                       >
                         <span className="flex items-center gap-2">
                           <span className={`${completed ? 'text-base' : 'text-lg md:text-xl'}`}>•</span>
-                          <span className={completed ? '' : 'font-semibold'}>{item.name}</span>
+                          <span className={completed ? '' : 'font-semibold'}>
+                            {item.name}
+                            {item.selectedSize && (
+                              <span className="ml-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-500/20 px-1.5 py-0.5 rounded">
+                                {item.selectedSize}
+                              </span>
+                            )}
+                            {item.quantity > 1 && (
+                              <span className="ml-1.5 text-xs text-muted-foreground">×{item.quantity}</span>
+                            )}
+                          </span>
                         </span>
                         <span className={`${completed ? 'text-sm' : 'text-base md:text-lg font-bold'} ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
-                          ₹{item.price}
+                          ₹{(item.price * (item.quantity || 1)).toFixed(0)}
                         </span>
                       </li>
                     ))}
@@ -317,7 +327,7 @@ const OrderManagement = ({ restaurantId, onNewOrder, newOrderTrigger, isVisible 
                       Total:
                     </span>
                     <span className={`${completed ? 'text-base font-semibold' : 'text-xl md:text-2xl font-bold'} ${completed ? 'text-muted-foreground' : 'text-primary'}`}>
-                      ₹{order.items?.items?.reduce((sum: number, item: any) => sum + (parseFloat(item.price) || 0), 0).toFixed(2)}
+                      ₹{order.items?.items?.reduce((sum: number, item: any) => sum + ((parseFloat(item.price) || 0) * (item.quantity || 1)), 0).toFixed(0)}
                     </span>
                   </div>
                 </div>

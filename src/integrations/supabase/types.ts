@@ -155,36 +155,42 @@ export type Database = {
           category_id: string | null
           created_at: string
           description: string
+          has_size_variants: boolean
           id: string
           image_url: string
           is_available: boolean
           name: string
           price: number
           restaurant_id: string
+          size_variants: { name: string; price: number }[]
           updated_at: string
         }
         Insert: {
           category_id?: string | null
           created_at?: string
           description: string
+          has_size_variants?: boolean
           id?: string
           image_url: string
           is_available?: boolean
           name: string
           price: number
           restaurant_id: string
+          size_variants?: { name: string; price: number }[]
           updated_at?: string
         }
         Update: {
           category_id?: string | null
           created_at?: string
           description?: string
+          has_size_variants?: boolean
           id?: string
           image_url?: string
           is_available?: boolean
           name?: string
           price?: number
           restaurant_id?: string
+          size_variants?: { name: string; price: number }[]
           updated_at?: string
         }
         Relationships: [

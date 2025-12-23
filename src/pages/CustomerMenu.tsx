@@ -268,7 +268,7 @@ const CustomerMenu = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from("menu_items")
-        .select("id, restaurant_id, name, description, price, image_url, is_available, category_id")
+        .select("id, restaurant_id, name, description, price, image_url, is_available, category_id, has_size_variants, size_variants")
         .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: true });
       return data || [];
@@ -462,20 +462,47 @@ const CustomerMenu = () => {
     };
   };
 
-  // Cart functions
-  const getCartItemQuantity = useCallback((itemId: string) => cart.find(i => i.id === itemId)?.quantity || 0, [cart]);
+  // Cart functions - now with size variant support
+  // Cart key is itemId + selectedSize to allow same item with different sizes
+  const getCartItemKey = (itemId: string, selectedSize?: string) => selectedSize ? `${itemId}_${selectedSize}` : itemId;
   
-  const addToCart = useCallback((item: any) => {
+  const getCartItemQuantity = useCallback((itemId: string, selectedSize?: string) => {
+    const key = getCartItemKey(itemId, selectedSize);
+    return cart.find(i => getCartItemKey(i.id, i.selectedSize) === key)?.quantity || 0;
+  }, [cart]);
+
+  // Get total quantity for an item (all sizes combined)
+  const getTotalItemQuantity = useCallback((itemId: string) => {
+    return cart.filter(i => i.id === itemId).reduce((sum, i) => sum + (i.quantity || 1), 0);
+  }, [cart]);
+  
+  const addToCart = useCallback((item: any, selectedSize?: { name: string; price: number }) => {
     setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
-      if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: (i.quantity || 1) + 1 } : i);
-      return [...prev, { ...item, quantity: 1 }];
+      const cartKey = getCartItemKey(item.id, selectedSize?.name);
+      const existing = prev.find(i => getCartItemKey(i.id, i.selectedSize) === cartKey);
+      
+      if (existing) {
+        return prev.map(i => getCartItemKey(i.id, i.selectedSize) === cartKey 
+          ? { ...i, quantity: (i.quantity || 1) + 1 } 
+          : i
+        );
+      }
+      
+      // Add new item with size info
+      const cartItem = {
+        ...item,
+        quantity: 1,
+        selectedSize: selectedSize?.name,
+        displayPrice: selectedSize?.price ?? item.price,
+      };
+      return [...prev, cartItem];
     });
   }, []);
 
-  const updateQuantity = useCallback((itemId: string, delta: number) => {
+  const updateQuantity = useCallback((itemId: string, delta: number, selectedSize?: string) => {
+    const cartKey = getCartItemKey(itemId, selectedSize);
     setCart(prev => prev.map(item => {
-      if (item.id === itemId) {
+      if (getCartItemKey(item.id, item.selectedSize) === cartKey) {
         const newQty = (item.quantity || 1) + delta;
         return newQty > 0 ? { ...item, quantity: newQty } : item;
       }
@@ -483,7 +510,10 @@ const CustomerMenu = () => {
     }).filter(item => item.quantity > 0));
   }, []);
 
-  const removeFromCart = useCallback((itemId: string) => setCart(prev => prev.filter(item => item.id !== itemId)), []);
+  const removeFromCart = useCallback((itemId: string, selectedSize?: string) => {
+    const cartKey = getCartItemKey(itemId, selectedSize);
+    setCart(prev => prev.filter(item => getCartItemKey(item.id, item.selectedSize) !== cartKey));
+  }, []);
 
 
   const placeOrder = async () => {
@@ -518,7 +548,14 @@ const CustomerMenu = () => {
 
     try {
       const orderNum = `ORD${Date.now().toString().slice(-6)}`;
-      const orderItems = cart.map(item => ({ id: item.id, name: item.name, price: item.price, quantity: item.quantity || 1, image_url: item.image_url }));
+      const orderItems = cart.map(item => ({ 
+        id: item.id, 
+        name: item.name, 
+        price: item.displayPrice ?? item.price, 
+        quantity: item.quantity || 1, 
+        image_url: item.image_url,
+        selectedSize: item.selectedSize || null,
+      }));
       
       // Add timeout to prevent hanging requests
       const orderPromise = supabase
@@ -644,7 +681,7 @@ const CustomerMenu = () => {
     return menuItems.filter(item => item.name.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q));
   }, [menuItems, searchQuery]);
 
-  const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0), [cart]);
+  const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + ((item.displayPrice ?? item.price) * (item.quantity || 1)), 0), [cart]);
   const totalItems = useMemo(() => cart.reduce((sum, item) => sum + (item.quantity || 1), 0), [cart]);
 
   const handleCategoryClick = (categoryId: string | null) => {
@@ -939,7 +976,7 @@ const CustomerMenu = () => {
             {searchResults.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {searchResults.map((item, idx) => (
-                  <MenuItemCard key={item.id} item={item} index={idx} cartQty={getCartItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} />
+                  <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} />
                 ))}
               </div>
             )}
@@ -989,7 +1026,7 @@ const CustomerMenu = () => {
                   {/* Items Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     {items.map((item, idx) => (
-                      <MenuItemCard key={item.id} item={item} index={idx} cartQty={getCartItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} />
+                      <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} />
                     ))}
                   </div>
                 </motion.section>
@@ -1012,7 +1049,7 @@ const CustomerMenu = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                   {uncategorizedItems.map((item, idx) => (
-                    <MenuItemCard key={item.id} item={item} index={idx} cartQty={getCartItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} />
+                    <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} />
                   ))}
                 </div>
               </motion.section>
@@ -1264,42 +1301,53 @@ const CustomerMenu = () => {
           ) : (
             <ScrollArea className="max-h-[40vh] sm:max-h-[50vh]">
               <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
-                {cart.map((item) => (
-                  <motion.div 
-                    key={item.id}
-                    layout
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex gap-3 p-2 sm:p-3 bg-zinc-100 dark:bg-zinc-900 rounded-xl sm:rounded-2xl"
-                  >
-                    <img 
-                      src={item.image_url || '/placeholder.svg'} 
-                      alt={item.name} 
-                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg sm:rounded-xl flex-shrink-0" 
-                    />
-                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                      <div>
-                        <h4 className="font-semibold text-sm sm:text-base line-clamp-1 text-zinc-900 dark:text-white">{item.name}</h4>
-                        <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">{formatINR(item.price)} each</p>
-                      </div>
-                      <div className="flex items-center justify-between mt-1 sm:mt-2">
-                        <div className="flex items-center bg-white dark:bg-zinc-800 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
-                          <button onClick={() => updateQuantity(item.id, -1)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                            <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                          <span className="w-7 sm:w-8 text-center font-semibold text-sm text-zinc-900 dark:text-white">{item.quantity || 1}</span>
-                          <button onClick={() => updateQuantity(item.id, 1)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
+                {cart.map((item) => {
+                  const cartKey = item.selectedSize ? `${item.id}_${item.selectedSize}` : item.id;
+                  const itemPrice = item.displayPrice ?? item.price;
+                  return (
+                    <motion.div 
+                      key={cartKey}
+                      layout
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex gap-3 p-2 sm:p-3 bg-zinc-100 dark:bg-zinc-900 rounded-xl sm:rounded-2xl"
+                    >
+                      <img 
+                        src={item.image_url || '/placeholder.svg'} 
+                        alt={item.name} 
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg sm:rounded-xl flex-shrink-0" 
+                      />
+                      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                        <div>
+                          <h4 className="font-semibold text-sm sm:text-base line-clamp-1 text-zinc-900 dark:text-white">
+                            {item.name}
+                            {item.selectedSize && (
+                              <span className="ml-1.5 text-xs font-medium text-violet-500 bg-violet-100 dark:bg-violet-500/20 px-1.5 py-0.5 rounded">
+                                {item.selectedSize}
+                              </span>
+                            )}
+                          </h4>
+                          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">{formatINR(itemPrice)} each</p>
                         </div>
-                        <span className="font-bold text-sm sm:text-base text-red-500">{formatINR(item.price * (item.quantity || 1))}</span>
+                        <div className="flex items-center justify-between mt-1 sm:mt-2">
+                          <div className="flex items-center bg-white dark:bg-zinc-800 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                            <button onClick={() => updateQuantity(item.id, -1, item.selectedSize)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                              <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </button>
+                            <span className="w-7 sm:w-8 text-center font-semibold text-sm text-zinc-900 dark:text-white">{item.quantity || 1}</span>
+                            <button onClick={() => updateQuantity(item.id, 1, item.selectedSize)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
+                              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </button>
+                          </div>
+                          <span className="font-bold text-sm sm:text-base text-red-500">{formatINR(itemPrice * (item.quantity || 1))}</span>
+                        </div>
                       </div>
-                    </div>
-                    <button onClick={() => removeFromCart(item.id)} className="self-start p-1.5 sm:p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg">
-                      <X className="w-4 h-4 text-zinc-400" />
-                    </button>
-                  </motion.div>
-                ))}
+                      <button onClick={() => removeFromCart(item.id, item.selectedSize)} className="self-start p-1.5 sm:p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg">
+                        <X className="w-4 h-4 text-zinc-400" />
+                      </button>
+                    </motion.div>
+                  );
+                })}
               </div>
             </ScrollArea>
           )}
@@ -1581,9 +1629,44 @@ const CustomerMenu = () => {
 };
 
 // Menu Item Card Component with smooth slide-in animation and expandable description
-const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageLoaded, setImageLoaded }: any) => {
+const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageLoaded, setImageLoaded, getCartQtyBySize }: any) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showSizeSelector, setShowSizeSelector] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<{ name: string; price: number } | null>(null);
   const hasLongDescription = item.description && item.description.length > 60;
+  const hasSizeVariants = item.has_size_variants && item.size_variants?.length > 0;
+
+  // Get quantity for specific size or total
+  const getQtyForSize = (sizeName?: string) => {
+    if (getCartQtyBySize) return getCartQtyBySize(item.id, sizeName);
+    return cartQty;
+  };
+
+  const handleAddClick = () => {
+    if (hasSizeVariants) {
+      setShowSizeSelector(true);
+    } else {
+      onAdd(item);
+    }
+  };
+
+  const handleSizeSelect = (size: { name: string; price: number }) => {
+    setSelectedSize(size);
+    onAdd(item, size);
+    setShowSizeSelector(false);
+  };
+
+  // Get display price - show range if has variants
+  const getDisplayPrice = () => {
+    if (hasSizeVariants && item.size_variants.length > 0) {
+      const prices = item.size_variants.map((v: any) => v.price);
+      const minPrice = Math.min(...prices);
+      const maxPrice = Math.max(...prices);
+      if (minPrice === maxPrice) return formatINR(minPrice);
+      return `${formatINR(minPrice)} - ${formatINR(maxPrice)}`;
+    }
+    return formatINR(item.price);
+  };
 
   return (
     <motion.div
@@ -1618,6 +1701,11 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                 <span className="text-white text-xs font-bold px-3 py-1.5 bg-red-500 rounded-xl shadow-lg">Unavailable</span>
               </div>
             )}
+            {hasSizeVariants && (
+              <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-violet-500 text-white text-[10px] font-bold rounded-lg">
+                {item.size_variants.length} Sizes
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -1633,19 +1721,13 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                   }}
                   transition={{ 
                     duration: 0.3, 
-                    ease: [0.4, 0.0, 0.2, 1] // Custom easing for smooth animation
+                    ease: [0.4, 0.0, 0.2, 1]
                   }}
                   className="overflow-hidden"
                 >
                   <motion.p
-                    animate={{ 
-                      opacity: 1,
-                      y: 0 
-                    }}
-                    transition={{ 
-                      duration: 0.2, 
-                      delay: isExpanded ? 0.1 : 0 
-                    }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: isExpanded ? 0.1 : 0 }}
                     className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed"
                   >
                     {item.description}
@@ -1660,10 +1742,7 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                   className="text-xs font-medium text-orange-500 hover:text-orange-600 mt-2 flex items-center gap-0.5 transition-colors"
                 >
                   <span>{isExpanded ? 'Less' : 'More'}</span>
-                  <motion.div
-                    animate={{ rotate: isExpanded ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
+                  <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                     <ChevronDown className="h-3 w-3" />
                   </motion.div>
                 </motion.button>
@@ -1671,11 +1750,13 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
             </div>
             
             <div className="flex items-center justify-between mt-3">
-              <span className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">{formatINR(item.price)}</span>
+              <span className="text-xl sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-500">
+                {getDisplayPrice()}
+              </span>
               
               {item.is_available && (
                 <AnimatePresence mode="wait">
-                  {cartQty > 0 ? (
+                  {cartQty > 0 && !hasSizeVariants ? (
                     <motion.div 
                       key="qty"
                       initial={{ scale: 0.8, opacity: 0 }}
@@ -1699,9 +1780,12 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                       exit={{ scale: 0.8, opacity: 0 }}
                       whileHover={{ scale: 1.08 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={() => onAdd(item)}
-                      className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-sm shadow-lg hover:shadow-xl transition-all"
+                      onClick={handleAddClick}
+                      className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-bold text-sm shadow-lg hover:shadow-xl transition-all flex items-center gap-1.5"
                     >
+                      {cartQty > 0 && hasSizeVariants && (
+                        <span className="bg-white/20 px-1.5 py-0.5 rounded-lg text-xs">{cartQty}</span>
+                      )}
                       ADD
                     </motion.button>
                   )}
@@ -1710,6 +1794,52 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
             </div>
           </div>
         </div>
+
+        {/* Size Selector Overlay */}
+        <AnimatePresence>
+          {showSizeSelector && hasSizeVariants && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50"
+            >
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Select Size</span>
+                  <button 
+                    onClick={() => setShowSizeSelector(false)}
+                    className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
+                  >
+                    <X className="w-4 h-4 text-zinc-500" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {item.size_variants.map((size: { name: string; price: number }, idx: number) => {
+                    const sizeQty = getQtyForSize(size.name);
+                    return (
+                      <motion.button
+                        key={idx}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleSizeSelect(size)}
+                        className="relative flex flex-col items-center p-3 rounded-xl border-2 border-zinc-200 dark:border-zinc-700 hover:border-orange-400 dark:hover:border-orange-500 bg-white dark:bg-zinc-900 transition-all"
+                      >
+                        <span className="font-semibold text-zinc-800 dark:text-white">{size.name}</span>
+                        <span className="text-orange-500 font-bold">{formatINR(size.price)}</span>
+                        {sizeQty > 0 && (
+                          <span className="absolute -top-2 -right-2 w-5 h-5 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                            {sizeQty}
+                          </span>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </Card>
     </motion.div>
   );
