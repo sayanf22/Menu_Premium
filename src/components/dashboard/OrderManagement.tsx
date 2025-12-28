@@ -391,7 +391,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('completed')}>
+        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-emerald-500/20">
               <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -435,7 +435,13 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               key={tab.id}
               variant={activeTab === tab.id ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                // Auto-switch to "All Time" for completed orders to show all history
+                if (tab.id === 'completed') {
+                  setDateFilter('all');
+                }
+              }}
               className="gap-2"
             >
               {tab.label}
