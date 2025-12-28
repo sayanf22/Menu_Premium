@@ -238,7 +238,7 @@ const CustomerMenu = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from("restaurants")
-        .select("social_links, name, description, logo_url, is_active, email, phone")
+        .select("social_links, name, description, logo_url, is_active, email, phone, orders_enabled, waiter_call_enabled")
         .eq("id", restaurantId)
         .maybeSingle();
       if (data && !data.is_active) {
@@ -262,6 +262,10 @@ const CustomerMenu = () => {
     gcTime: 24 * 60 * 60 * 1000,
     enabled: !!restaurantId,
   });
+
+  // Check if ordering is enabled
+  const ordersEnabled = restaurant?.orders_enabled !== false;
+  const waiterCallEnabled = restaurant?.waiter_call_enabled !== false;
 
   const { data: menuItems = [], isLoading: isLoadingItems } = useQuery({
     queryKey: ['menuItems', restaurantId],
@@ -976,7 +980,7 @@ const CustomerMenu = () => {
             {searchResults.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {searchResults.map((item, idx) => (
-                  <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} />
+                  <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} ordersEnabled={ordersEnabled} />
                 ))}
               </div>
             )}
@@ -1026,7 +1030,7 @@ const CustomerMenu = () => {
                   {/* Items Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     {items.map((item, idx) => (
-                      <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} />
+                      <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} ordersEnabled={ordersEnabled} />
                     ))}
                   </div>
                 </motion.section>
@@ -1049,7 +1053,7 @@ const CustomerMenu = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                   {uncategorizedItems.map((item, idx) => (
-                    <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} />
+                    <MenuItemCard key={item.id} item={item} index={idx} cartQty={getTotalItemQuantity(item.id)} onAdd={addToCart} onUpdate={updateQuantity} formatINR={formatINR} imageLoaded={imageLoaded} setImageLoaded={setImageLoaded} getCartQtyBySize={getCartItemQuantity} ordersEnabled={ordersEnabled} />
                   ))}
                 </div>
               </motion.section>
@@ -1136,10 +1140,12 @@ const CustomerMenu = () => {
       </main>
 
       {/* Service Call Button - Waiter/Water/Bill */}
-      <ServiceCallButton 
-        restaurantId={restaurantId || ""} 
-        tableNumber={tableNumber} 
-      />
+      {waiterCallEnabled && (
+        <ServiceCallButton 
+          restaurantId={restaurantId || ""} 
+          tableNumber={tableNumber} 
+        />
+      )}
 
       {/* Floating Order History Button - Mobile Optimized */}
       <AnimatePresence>
@@ -1165,7 +1171,7 @@ const CustomerMenu = () => {
 
       {/* Floating Cart Button */}
       <AnimatePresence>
-        {cart.length > 0 && (
+        {cart.length > 0 && ordersEnabled && (
           <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -1629,7 +1635,7 @@ const CustomerMenu = () => {
 };
 
 // Menu Item Card Component with smooth slide-in animation and expandable description
-const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageLoaded, setImageLoaded, getCartQtyBySize }: any) => {
+const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageLoaded, setImageLoaded, getCartQtyBySize, ordersEnabled = true }: any) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSizeSelector, setShowSizeSelector] = useState(false);
   const [selectedSize, setSelectedSize] = useState<{ name: string; price: number } | null>(null);
@@ -1754,7 +1760,7 @@ const MenuItemCard = ({ item, index, cartQty, onAdd, onUpdate, formatINR, imageL
                 {getDisplayPrice()}
               </span>
               
-              {item.is_available && (
+              {item.is_available && ordersEnabled && (
                 <AnimatePresence mode="wait">
                   {cartQty > 0 && !hasSizeVariants ? (
                     <motion.div 

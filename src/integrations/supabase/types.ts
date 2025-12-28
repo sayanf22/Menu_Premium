@@ -484,12 +484,14 @@ export type Database = {
           is_active: boolean
           logo_url: string | null
           name: string
+          orders_enabled: boolean
           phone: string | null
           qr_code_url: string | null
           social_links: Json | null
           subscription_plan_id: string | null
           updated_at: string
           user_id: string
+          waiter_call_enabled: boolean
         }
         Insert: {
           created_at?: string
@@ -499,12 +501,14 @@ export type Database = {
           is_active?: boolean
           logo_url?: string | null
           name: string
+          orders_enabled?: boolean
           phone?: string | null
           qr_code_url?: string | null
           social_links?: Json | null
           subscription_plan_id?: string | null
           updated_at?: string
           user_id: string
+          waiter_call_enabled?: boolean
         }
         Update: {
           created_at?: string
@@ -514,12 +518,14 @@ export type Database = {
           is_active?: boolean
           logo_url?: string | null
           name?: string
+          orders_enabled?: boolean
           phone?: string | null
           qr_code_url?: string | null
           social_links?: Json | null
           subscription_plan_id?: string | null
           updated_at?: string
           user_id?: string
+          waiter_call_enabled?: boolean
         }
         Relationships: [
           {

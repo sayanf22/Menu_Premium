@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, Save, Upload, X, Bell, BellOff, BellRing, 
-  Store, ImageIcon, CheckCircle2, AlertCircle
+  Store, ImageIcon, CheckCircle2, AlertCircle, Settings, ShoppingCart, HandHelping, Crown
 } from "lucide-react";
 import { uploadToR2WithProgress, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 import { motion } from "framer-motion";
@@ -29,6 +29,12 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null);
   
+  // Feature toggles
+  const [ordersEnabled, setOrdersEnabled] = useState(true);
+  const [waiterCallEnabled, setWaiterCallEnabled] = useState(true);
+  const [hasOrdersFeature, setHasOrdersFeature] = useState(false);
+  const [featureSaving, setFeatureSaving] = useState(false);
+  
   // Notification states
   const [notificationSupported, setNotificationSupported] = useState(true);
   const [notificationSubscribed, setNotificationSubscribed] = useState(false);
@@ -39,14 +45,29 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   useEffect(() => {
     fetchRestaurantData();
     initializeNotifications();
+    checkSubscriptionFeatures();
   }, [restaurantId]);
+
+  const checkSubscriptionFeatures = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data } = await supabase.rpc('get_user_subscription_status', { p_user_id: user.id });
+      if (data && data[0]) {
+        setHasOrdersFeature(data[0].has_orders_feature === true);
+      }
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+    }
+  };
 
   const fetchRestaurantData = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from("restaurants")
-        .select("name, description, logo_url")
+        .select("name, description, logo_url, orders_enabled, waiter_call_enabled")
         .eq("id", restaurantId)
         .single();
 
@@ -56,6 +77,8 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       setDescription(data.description || "");
       setLogoUrl(data.logo_url || null);
       setOriginalLogoUrl(data.logo_url || null);
+      setOrdersEnabled(data.orders_enabled ?? true);
+      setWaiterCallEnabled(data.waiter_call_enabled ?? true);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -256,6 +279,47 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
     }
   };
 
+  const handleFeatureToggle = async (feature: 'orders' | 'waiter_call', enabled: boolean) => {
+    if (!hasOrdersFeature) {
+      toast({
+        title: "Upgrade Required",
+        description: "This feature requires the Advanced plan",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setFeatureSaving(true);
+      
+      const updateData = feature === 'orders' 
+        ? { orders_enabled: enabled }
+        : { waiter_call_enabled: enabled };
+
+      const { error } = await supabase
+        .from("restaurants")
+        .update(updateData)
+        .eq("id", restaurantId);
+
+      if (error) throw error;
+
+      if (feature === 'orders') {
+        setOrdersEnabled(enabled);
+      } else {
+        setWaiterCallEnabled(enabled);
+      }
+
+      toast({
+        title: enabled ? "Feature Enabled" : "Feature Disabled",
+        description: `${feature === 'orders' ? 'Online ordering' : 'Waiter call'} is now ${enabled ? 'enabled' : 'disabled'}`,
+      });
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to update setting", variant: "destructive" });
+    } finally {
+      setFeatureSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -382,6 +446,98 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
               </>
             )}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Feature Settings Card */}
+      <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
+        <CardHeader className="pb-3 md:pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+              <Settings className="h-5 w-5 md:h-6 md:w-6 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-base md:text-lg">Feature Settings</CardTitle>
+              <CardDescription className="text-sm">
+                Control which features are available to customers
+              </CardDescription>
+            </div>
+            {hasOrdersFeature && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <Crown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Advanced</span>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-4">
+          {!hasOrdersFeature ? (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-3">
+                <Crown className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Upgrade to Advanced Plan</p>
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                    Online ordering and waiter call features require the Advanced plan. Upgrade to unlock these features.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Online Ordering Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${ordersEnabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                    <ShoppingCart className={`h-5 w-5 ${ordersEnabled ? 'text-green-600 dark:text-green-400' : 'text-zinc-500'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm md:text-base">Online Ordering</p>
+                    <p className="text-xs md:text-sm text-zinc-500">
+                      {ordersEnabled ? 'Customers can place orders from the menu' : 'Ordering is disabled for customers'}
+                    </p>
+                  </div>
+                </div>
+                {featureSaving ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                ) : (
+                  <Switch
+                    checked={ordersEnabled}
+                    onCheckedChange={(checked) => handleFeatureToggle('orders', checked)}
+                    disabled={featureSaving}
+                  />
+                )}
+              </div>
+
+              {/* Waiter Call Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${waiterCallEnabled ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                    <HandHelping className={`h-5 w-5 ${waiterCallEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500'}`} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm md:text-base">Waiter Call</p>
+                    <p className="text-xs md:text-sm text-zinc-500">
+                      {waiterCallEnabled ? 'Customers can request waiter assistance' : 'Waiter call is disabled'}
+                    </p>
+                  </div>
+                </div>
+                {featureSaving ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                ) : (
+                  <Switch
+                    checked={waiterCallEnabled}
+                    onCheckedChange={(checked) => handleFeatureToggle('waiter_call', checked)}
+                    disabled={featureSaving}
+                  />
+                )}
+              </div>
+
+              <p className="text-xs text-zinc-500 text-center">
+                💡 Changes take effect immediately for new customers viewing your menu
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
 
