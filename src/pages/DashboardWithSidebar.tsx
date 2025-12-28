@@ -1018,7 +1018,7 @@ const Dashboard = ({
   console.log('🎨 Dashboard render:', { activeTab, hasNewOrder: !!newOrderTrigger });
   return (
     <div className="flex flex-1 overflow-hidden">
-      <div className="p-4 md:p-10 md:rounded-tl-2xl border-t md:border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-4 flex-1 w-full overflow-y-auto">
+      <div className="p-3 md:p-5 md:rounded-tl-2xl border-t md:border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-3 flex-1 w-full overflow-y-auto">
         {activeTab === "stats" && <StatsOverview restaurantId={restaurantId} />}
         {activeTab === "menu" && <MenuManagement restaurantId={restaurantId} />}
         

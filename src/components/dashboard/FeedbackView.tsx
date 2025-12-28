@@ -55,11 +55,11 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
 
   const renderStars = (rating: number) => {
     return (
-      <div className="flex gap-1">
+      <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-5 w-5 ${
+            className={`h-4 w-4 ${
               star <= rating
                 ? "fill-primary text-primary"
                 : "fill-muted text-muted"
@@ -71,37 +71,37 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
-        <h2 className="text-3xl font-bold mb-2">Customer Feedback</h2>
-        <p className="text-muted-foreground">View feedback from your customers</p>
+        <h2 className="text-xl md:text-2xl font-bold mb-0.5">Customer Feedback</h2>
+        <p className="text-xs text-muted-foreground">View feedback from your customers</p>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-2">
         {feedback.map((item) => (
           <Card key={item.id} className="hover:shadow-[var(--shadow-medium)] transition-all duration-300">
-            <CardHeader>
+            <CardHeader className="p-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-lg">
+                  <CardTitle className="text-sm">
                     Order #{item.orders.order_number}
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground">
                     Table {item.orders.table_number}
                   </p>
                 </div>
                 <div className="text-right">
                   {renderStars(item.rating)}
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-[10px] text-muted-foreground mt-1">
                     {new Date(item.created_at).toLocaleDateString()}
                   </p>
                 </div>
               </div>
             </CardHeader>
             {item.comment && (
-              <CardContent>
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <p className="text-sm text-muted-foreground italic">
+              <CardContent className="p-3 pt-0">
+                <div className="bg-muted/50 rounded-lg p-2.5">
+                  <p className="text-xs text-muted-foreground italic">
                     "{item.comment}"
                   </p>
                 </div>
@@ -112,10 +112,10 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
       </div>
 
       {feedback.length === 0 && (
-        <Card className="p-12 text-center">
-          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">No feedback yet</p>
-          <p className="text-sm text-muted-foreground mt-2">
+        <Card className="p-8 text-center">
+          <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">No feedback yet</p>
+          <p className="text-xs text-muted-foreground mt-1">
             Customer feedback will appear here after orders are completed
           </p>
         </Card>
