@@ -256,40 +256,40 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold mb-0.5">Your QR Code</h2>
-          <p className="text-xs text-muted-foreground">Customizable QR code for your menu</p>
+          <h2 className="text-2xl md:text-3xl font-bold mb-1">Your QR Code</h2>
+          <p className="text-sm text-muted-foreground">Customizable QR code for your menu</p>
         </div>
         <Button 
           variant={showCustomize ? "default" : "outline"} 
-          size="sm"
+          size="default"
           onClick={() => setShowCustomize(!showCustomize)}
-          className="gap-1.5 h-8"
+          className="gap-2"
         >
-          <Settings2 className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-xs">Customize</span>
+          <Settings2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Customize</span>
         </Button>
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-3">
+      <div className="grid lg:grid-cols-5 gap-6">
         {/* QR Code Preview */}
         <Card className="lg:col-span-3 overflow-hidden border-0 shadow-xl">
           <CardContent className="p-0">
-            <div className="bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4 md:p-6">
-              <div className="max-w-xs mx-auto">
+            <div className="bg-gradient-to-br from-primary/5 via-background to-primary/10 p-6 md:p-8">
+              <div className="max-w-sm mx-auto">
                 <motion.div 
                   layout
-                  className="relative bg-white rounded-2xl p-4 md:p-6 shadow-2xl"
+                  className="relative bg-white rounded-2xl p-6 md:p-8 shadow-2xl"
                 >
                   {/* Corner decorations */}
                   {config.frameStyle !== 'none' && (
                     <>
-                      <div className={`absolute top-2 left-2 w-6 h-6 border-t-3 border-l-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tl-xl' : 'rounded-tl-lg'}`} />
-                      <div className={`absolute top-2 right-2 w-6 h-6 border-t-3 border-r-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tr-xl' : 'rounded-tr-lg'}`} />
-                      <div className={`absolute bottom-2 left-2 w-6 h-6 border-b-3 border-l-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-bl-xl' : 'rounded-bl-lg'}`} />
-                      <div className={`absolute bottom-2 right-2 w-6 h-6 border-b-3 border-r-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-br-xl' : 'rounded-br-lg'}`} />
+                      <div className={`absolute top-3 left-3 w-8 h-8 border-t-3 border-l-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tl-xl' : 'rounded-tl-lg'}`} />
+                      <div className={`absolute top-3 right-3 w-8 h-8 border-t-3 border-r-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tr-xl' : 'rounded-tr-lg'}`} />
+                      <div className={`absolute bottom-3 left-3 w-8 h-8 border-b-3 border-l-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-bl-xl' : 'rounded-bl-lg'}`} />
+                      <div className={`absolute bottom-3 right-3 w-8 h-8 border-b-3 border-r-3 border-primary ${config.frameStyle === 'fancy' ? 'rounded-br-xl' : 'rounded-br-lg'}`} />
                     </>
                   )}
                   
@@ -302,10 +302,10 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                     transition={{ type: "spring", stiffness: 300, damping: 25 }}
                   />
                   
-                  <div className="mt-2 text-center">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full">
-                      <Smartphone className="w-3 h-3 text-primary" />
-                      <span className="text-xs font-medium text-primary">Scan to view menu</span>
+                  <div className="mt-4 text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full">
+                      <Smartphone className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">Scan to view menu</span>
                     </div>
                   </div>
                 </motion.div>
@@ -313,23 +313,23 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
             </div>
 
             {/* Download buttons */}
-            <div className="p-3 bg-muted/30 border-t">
-              <div className="grid grid-cols-4 gap-2">
-                <Button variant="outline" size="sm" onClick={() => downloadQRCode("small")} className="flex-col h-auto py-2 gap-0.5">
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="text-[10px]">Small</span>
+            <div className="p-4 bg-muted/30 border-t">
+              <div className="grid grid-cols-4 gap-3">
+                <Button variant="outline" size="default" onClick={() => downloadQRCode("small")} className="flex-col h-auto py-3 gap-1">
+                  <Download className="h-4 w-4" />
+                  <span className="text-xs">Small</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => downloadQRCode("medium")} className="flex-col h-auto py-2 gap-0.5">
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="text-[10px]">Medium</span>
+                <Button variant="outline" size="default" onClick={() => downloadQRCode("medium")} className="flex-col h-auto py-3 gap-1">
+                  <Download className="h-4 w-4" />
+                  <span className="text-xs">Medium</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => downloadQRCode("large")} className="flex-col h-auto py-2 gap-0.5">
-                  <Printer className="h-3.5 w-3.5" />
-                  <span className="text-[10px]">Print</span>
+                <Button variant="outline" size="default" onClick={() => downloadQRCode("large")} className="flex-col h-auto py-3 gap-1">
+                  <Printer className="h-4 w-4" />
+                  <span className="text-xs">Print</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => window.open(menuUrl, "_blank")} className="flex-col h-auto py-2 gap-0.5">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span className="text-[10px]">Preview</span>
+                <Button variant="outline" size="default" onClick={() => window.open(menuUrl, "_blank")} className="flex-col h-auto py-3 gap-1">
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="text-xs">Preview</span>
                 </Button>
               </div>
             </div>
@@ -337,7 +337,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
         </Card>
 
         {/* Sidebar - Customization or Info */}
-        <div className="lg:col-span-2 space-y-2">
+        <div className="lg:col-span-2 space-y-4">
           <AnimatePresence mode="wait">
             {showCustomize ? (
               <motion.div
@@ -345,22 +345,22 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="space-y-2"
+                className="space-y-4"
               >
                 {/* Style Selection */}
                 <Card className="border-0 shadow-lg">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-xs flex items-center gap-1.5">
-                        <Palette className="w-3.5 h-3.5 text-primary" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        <Palette className="w-4 h-4 text-primary" />
                         QR Style
                       </h3>
-                      <Button variant="ghost" size="sm" onClick={resetConfig} className="h-6 px-2 text-[10px]">
-                        <RotateCcw className="h-2.5 w-2.5 mr-0.5" />
+                      <Button variant="ghost" size="sm" onClick={resetConfig} className="h-8 px-3 text-xs">
+                        <RotateCcw className="h-3 w-3 mr-1" />
                         Reset
                       </Button>
                     </div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-3 gap-2">
                       {QR_STYLES.map((style) => {
                         const Icon = style.icon;
                         const isStandard = style.id === 'standard';
@@ -370,14 +370,14 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setConfig(prev => ({ ...prev, style: style.dotStyle }))}
-                            className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all ${
+                            className={`flex flex-col items-center gap-1 p-3 rounded-lg transition-all ${
                               config.style === style.dotStyle 
                                 ? 'bg-primary text-primary-foreground shadow-lg' 
                                 : 'bg-muted hover:bg-muted/80'
                             } ${isStandard ? 'ring-1 ring-green-500/30' : ''}`}
                           >
-                            <Icon className="h-4 w-4" />
-                            <span className="text-[9px] font-medium">{style.name}</span>
+                            <Icon className="h-5 w-5" />
+                            <span className="text-xs font-medium">{style.name}</span>
                           </motion.button>
                         );
                       })}
@@ -387,9 +387,9 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
                 {/* Color Presets */}
                 <Card className="border-0 shadow-lg">
-                  <CardContent className="p-3">
-                    <h3 className="font-semibold text-xs mb-2">🎨 Color Theme</h3>
-                    <div className="grid grid-cols-4 gap-1.5">
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-sm mb-4">🎨 Color Theme</h3>
+                    <div className="grid grid-cols-4 gap-2">
                       {COLOR_PRESETS.map((preset) => {
                         const isGradient = preset.fg.startsWith('gradient:');
                         const displayColor = isGradient 
@@ -401,7 +401,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                             whileHover={{ scale: 1.1 }}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => setColorPreset(preset)}
-                            className={`relative h-8 rounded-lg border-2 transition-all ${
+                            className={`relative h-10 rounded-lg border-2 transition-all ${
                               config.fgColor === preset.fg 
                                 ? 'border-primary ring-2 ring-primary/30' 
                                 : 'border-transparent hover:border-muted-foreground/30'
@@ -417,10 +417,10 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
                 {/* Dot Size */}
                 <Card className="border-0 shadow-lg">
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-xs font-semibold">Dot Size</Label>
-                      <span className="text-[10px] text-muted-foreground">{Math.round(config.dotScale * 100)}%</span>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label className="text-sm font-semibold">Dot Size</Label>
+                      <span className="text-xs text-muted-foreground">{Math.round(config.dotScale * 100)}%</span>
                     </div>
                     <Slider
                       value={[config.dotScale]}
@@ -435,16 +435,16 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
                 {/* Frame Style */}
                 <Card className="border-0 shadow-lg">
-                  <CardContent className="p-3">
-                    <h3 className="font-semibold text-xs mb-2">🖼️ Frame Style</h3>
-                    <div className="grid grid-cols-4 gap-1.5">
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-sm mb-4">🖼️ Frame Style</h3>
+                    <div className="grid grid-cols-4 gap-2">
                       {(['none', 'simple', 'rounded', 'fancy'] as const).map((frame) => (
                         <Button
                           key={frame}
                           variant={config.frameStyle === frame ? "default" : "outline"}
                           size="sm"
                           onClick={() => setConfig(prev => ({ ...prev, frameStyle: frame }))}
-                          className="capitalize text-[10px] h-7"
+                          className="capitalize text-xs h-9"
                         >
                           {frame}
                         </Button>
@@ -459,24 +459,24 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="space-y-2"
+                className="space-y-4"
               >
                 {/* QR Link */}
                 <Card className="border-0 shadow-lg">
-                  <CardContent className="p-3">
-                    <h3 className="font-semibold text-xs mb-2 flex items-center gap-1.5">
-                      <QrIcon className="w-3.5 h-3.5 text-primary" />
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <QrIcon className="w-4 h-4 text-primary" />
                       QR Scan Link
                     </h3>
-                    <div className="flex gap-1.5">
-                      <div className="flex-1 p-2 bg-muted rounded-lg overflow-hidden">
-                        <code className="text-[10px] break-all text-muted-foreground">{scanUrl}</code>
+                    <div className="flex gap-2">
+                      <div className="flex-1 p-3 bg-muted rounded-lg overflow-hidden">
+                        <code className="text-xs break-all text-muted-foreground">{scanUrl}</code>
                       </div>
-                      <Button variant="outline" size="icon" onClick={copyUrl} className="flex-shrink-0 h-8 w-8">
-                        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                      <Button variant="outline" size="icon" onClick={copyUrl} className="flex-shrink-0 h-10 w-10">
+                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1.5">
+                    <p className="text-xs text-muted-foreground mt-3">
                       ⏱️ Each scan creates a 90-minute session
                     </p>
                   </CardContent>
@@ -484,9 +484,9 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
                 {/* Quick Tips */}
                 <Card className="border-0 shadow-lg">
-                  <CardContent className="p-3">
-                    <h3 className="font-semibold text-xs mb-2">📋 Quick Tips</h3>
-                    <div className="space-y-1 text-[10px]">
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-sm mb-3">📋 Quick Tips</h3>
+                    <div className="space-y-2 text-sm">
                       <p>• Print on white paper for best contrast</p>
                       <p>• Minimum size: 2x2 inches for tables</p>
                       <p>• Place in well-lit areas</p>
@@ -497,11 +497,11 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
                 {/* Where to place */}
                 <Card className="border-0 shadow-lg bg-gradient-to-br from-primary/5 to-primary/10">
-                  <CardContent className="p-3">
-                    <h3 className="font-semibold text-xs mb-2">💡 Where to place</h3>
-                    <div className="flex flex-wrap gap-1">
+                  <CardContent className="p-5">
+                    <h3 className="font-semibold text-sm mb-3">💡 Where to place</h3>
+                    <div className="flex flex-wrap gap-2">
                       {["Table tents", "Menu cards", "Wall posters", "Receipts", "Window", "Counter"].map(place => (
-                        <span key={place} className="px-2 py-0.5 bg-background rounded-full text-[10px] font-medium">{place}</span>
+                        <span key={place} className="px-3 py-1 bg-background rounded-full text-xs font-medium">{place}</span>
                       ))}
                     </div>
                   </CardContent>

@@ -62,48 +62,48 @@ const SocialLinksForm = ({ restaurantId }: Props) => {
 
   return (
     <Card className="overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between p-3">
-        <CardTitle className="text-sm">Social Media</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between p-5">
+        <CardTitle className="text-base">Social Media</CardTitle>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="h-7 text-xs"><Edit2 className="h-3 w-3 mr-1"/>Edit</Button>
+            <Button size="sm" variant="outline" className="h-9"><Edit2 className="h-4 w-4 mr-2"/>Edit</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="text-base">Update Social Links</DialogTitle>
+              <DialogTitle className="text-lg">Update Social Links</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSave} className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Instagram</Label>
-                <Input value={links.instagram || ''} onChange={e => setLinks({ ...links, instagram: e.target.value })} placeholder="https://instagram.com/yourpage" className="h-8 text-sm" />
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Instagram</Label>
+                <Input value={links.instagram || ''} onChange={e => setLinks({ ...links, instagram: e.target.value })} placeholder="https://instagram.com/yourpage" className="h-10" />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Facebook</Label>
-                <Input value={links.facebook || ''} onChange={e => setLinks({ ...links, facebook: e.target.value })} placeholder="https://facebook.com/yourpage" className="h-8 text-sm" />
+              <div className="space-y-2">
+                <Label className="text-sm">Facebook</Label>
+                <Input value={links.facebook || ''} onChange={e => setLinks({ ...links, facebook: e.target.value })} placeholder="https://facebook.com/yourpage" className="h-10" />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Twitter</Label>
-                <Input value={links.twitter || ''} onChange={e => setLinks({ ...links, twitter: e.target.value })} placeholder="https://twitter.com/yourpage" className="h-8 text-sm" />
+              <div className="space-y-2">
+                <Label className="text-sm">Twitter</Label>
+                <Input value={links.twitter || ''} onChange={e => setLinks({ ...links, twitter: e.target.value })} placeholder="https://twitter.com/yourpage" className="h-10" />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Website</Label>
-                <Input value={links.website || ''} onChange={e => setLinks({ ...links, website: e.target.value })} placeholder="https://yourwebsite.com" className="h-8 text-sm" />
+              <div className="space-y-2">
+                <Label className="text-sm">Website</Label>
+                <Input value={links.website || ''} onChange={e => setLinks({ ...links, website: e.target.value })} placeholder="https://yourwebsite.com" className="h-10" />
               </div>
-              <Button type="submit" className="w-full h-8 text-sm" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
+              <Button type="submit" className="w-full h-10" disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
             </form>
           </DialogContent>
         </Dialog>
       </CardHeader>
-      <CardContent className="p-3 pt-0">
+      <CardContent className="p-5 pt-0">
         {hasAny ? (
-          <div className="flex items-center gap-3 text-muted-foreground">
-            {links.instagram && <a href={links.instagram} target="_blank" rel="noreferrer" aria-label="Instagram"><Instagram className="h-4 w-4"/></a>}
-            {links.facebook && <a href={links.facebook} target="_blank" rel="noreferrer" aria-label="Facebook"><Facebook className="h-4 w-4"/></a>}
-            {links.twitter && <a href={links.twitter} target="_blank" rel="noreferrer" aria-label="Twitter"><Twitter className="h-4 w-4"/></a>}
-            {links.website && <a href={links.website} target="_blank" rel="noreferrer" aria-label="Website"><Globe className="h-4 w-4"/></a>}
+          <div className="flex items-center gap-4 text-muted-foreground">
+            {links.instagram && <a href={links.instagram} target="_blank" rel="noreferrer" aria-label="Instagram"><Instagram className="h-5 w-5 hover:text-primary transition-colors"/></a>}
+            {links.facebook && <a href={links.facebook} target="_blank" rel="noreferrer" aria-label="Facebook"><Facebook className="h-5 w-5 hover:text-primary transition-colors"/></a>}
+            {links.twitter && <a href={links.twitter} target="_blank" rel="noreferrer" aria-label="Twitter"><Twitter className="h-5 w-5 hover:text-primary transition-colors"/></a>}
+            {links.website && <a href={links.website} target="_blank" rel="noreferrer" aria-label="Website"><Globe className="h-5 w-5 hover:text-primary transition-colors"/></a>}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">No links yet. Click Edit to add.</p>
+          <p className="text-sm text-muted-foreground">No links yet. Click Edit to add.</p>
         )}
       </CardContent>
     </Card>

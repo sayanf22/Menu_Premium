@@ -662,13 +662,15 @@ const CustomerMenu = () => {
     // Orders remain visible in history for 90 mins
   };
 
-  // Memoized data
-  const groupedItems = useMemo(() => categories.reduce((acc, cat) => {
-    acc[cat.id] = menuItems.filter(item => item.category_id === cat.id);
-    return acc;
-  }, {} as Record<string, any[]>), [categories, menuItems]);
+  // Memoized data - filter out unavailable items
+  const availableMenuItems = useMemo(() => menuItems.filter(item => item.is_available), [menuItems]);
 
-  const uncategorizedItems = useMemo(() => menuItems.filter(item => !item.category_id), [menuItems]);
+  const groupedItems = useMemo(() => categories.reduce((acc, cat) => {
+    acc[cat.id] = availableMenuItems.filter(item => item.category_id === cat.id);
+    return acc;
+  }, {} as Record<string, any[]>), [categories, availableMenuItems]);
+
+  const uncategorizedItems = useMemo(() => availableMenuItems.filter(item => !item.category_id), [availableMenuItems]);
 
   // Filter items based on selected category
   const displayedCategories = useMemo(() => {
@@ -682,8 +684,8 @@ const CustomerMenu = () => {
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
     const q = searchQuery.toLowerCase();
-    return menuItems.filter(item => item.name.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q));
-  }, [menuItems, searchQuery]);
+    return availableMenuItems.filter(item => item.name.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q));
+  }, [availableMenuItems, searchQuery]);
 
   const totalPrice = useMemo(() => cart.reduce((sum, item) => sum + ((item.displayPrice ?? item.price) * (item.quantity || 1)), 0), [cart]);
   const totalItems = useMemo(() => cart.reduce((sum, item) => sum + (item.quantity || 1), 0), [cart]);

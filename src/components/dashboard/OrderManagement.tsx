@@ -358,19 +358,18 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold">Order Management</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold">Order Management</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Real-time order tracking grouped by customer session
           </p>
         </div>
         <Button 
           onClick={fetchOrders} 
           variant="outline"
-          size="sm"
           className="gap-2"
           disabled={isRefreshing}
         >
@@ -380,57 +379,57 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Card className="p-3 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('active')}>
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-orange-500/20">
-              <Timer className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('active')}>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-orange-500/20">
+              <Timer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <div>
-              <p className="text-xl font-bold">{activeOrdersCount}</p>
-              <p className="text-[10px] text-muted-foreground">Active Orders</p>
+              <p className="text-2xl font-bold">{activeOrdersCount}</p>
+              <p className="text-xs text-muted-foreground">Active Orders</p>
             </div>
           </div>
         </Card>
-        <Card className="p-3 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-emerald-500/20">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-xl font-bold">{completedOrdersCount}</p>
-              <p className="text-[10px] text-muted-foreground">Completed</p>
+              <p className="text-2xl font-bold">{completedOrdersCount}</p>
+              <p className="text-xs text-muted-foreground">Completed</p>
             </div>
           </div>
         </Card>
-        <Card className="p-3 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-blue-500/20">
-              <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-500/20">
+              <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-xl font-bold">₹{todayRevenue.toFixed(0)}</p>
-              <p className="text-[10px] text-muted-foreground">Today's Revenue</p>
+              <p className="text-2xl font-bold">₹{todayRevenue.toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground">Today's Revenue</p>
             </div>
           </div>
         </Card>
-        <Card className="p-3 bg-gradient-to-br from-violet-500/10 to-violet-500/5 border-violet-500/20">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-xl bg-violet-500/20">
-              <ShoppingBag className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+        <Card className="p-4 bg-gradient-to-br from-violet-500/10 to-violet-500/5 border-violet-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-violet-500/20">
+              <ShoppingBag className="h-5 w-5 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <p className="text-xl font-bold">{sessionGroups.reduce((sum, g) => sum + g.totalItems, 0)}</p>
-              <p className="text-[10px] text-muted-foreground">Items in View</p>
+              <p className="text-2xl font-bold">{sessionGroups.reduce((sum, g) => sum + g.totalItems, 0)}</p>
+              <p className="text-xs text-muted-foreground">Items in View</p>
             </div>
           </div>
         </Card>
       </div>
 
       {/* Filter Tabs & Search */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         {/* Tabs */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {tabs.map(tab => (
             <Button
               key={tab.id}
@@ -443,10 +442,10 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                   setDateFilter('all');
                 }
               }}
-              className="gap-1.5 h-8 text-xs"
+              className="gap-2"
             >
               {tab.label}
-              <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'} className="ml-0.5 text-[10px] px-1.5">
+              <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'} className="ml-1">
                 {tab.count}
               </Badge>
             </Button>
@@ -454,56 +453,54 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
         </div>
 
         {/* Search & Date Filter */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by order #, table, or item..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-8 h-8 text-sm"
+              className="pl-10 pr-10"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             <Button
               variant={dateFilter === 'today' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateFilter('today')}
-              className="gap-1 h-8 text-xs"
+              className="gap-2"
             >
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-4 w-4" />
               Today
             </Button>
             <Button
               variant={dateFilter === 'week' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateFilter('week')}
-              className="h-8 text-xs"
             >
-              Week
+              This Week
             </Button>
             <Button
               variant={dateFilter === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateFilter('all')}
-              className="h-8 text-xs"
             >
-              All
+              All Time
             </Button>
           </div>
         </div>
       </div>
 
       {/* Session Groups */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         <AnimatePresence mode="popLayout">
           {sessionGroups.map((group) => {
             const isExpanded = expandedSessions.has(group.sessionId);
@@ -527,10 +524,10 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                   {/* Session Header */}
                   <button
                     onClick={() => toggleSessionExpand(group.sessionId)}
-                    className="w-full p-3 flex items-center justify-between gap-3 hover:bg-muted/50 transition-colors text-left"
+                    className="w-full p-4 md:p-5 flex items-center justify-between gap-4 hover:bg-muted/50 transition-colors text-left"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-xl ${
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-2xl ${
                         group.allCompleted 
                           ? 'bg-muted' 
                           : group.hasNewOrder 
@@ -538,30 +535,30 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                             : 'bg-primary/10'
                       }`}>
                         {group.hasNewOrder && !group.allCompleted && (
-                          <Bell className="h-5 w-5 text-orange-500 animate-bounce" />
+                          <Bell className="h-6 w-6 text-orange-500 animate-bounce" />
                         )}
                         {!group.hasNewOrder && !group.allCompleted && (
-                          <Utensils className="h-5 w-5 text-primary" />
+                          <Utensils className="h-6 w-6 text-primary" />
                         )}
                         {group.allCompleted && (
-                          <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
+                          <CheckCircle2 className="h-6 w-6 text-muted-foreground" />
                         )}
                       </div>
                       
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-lg font-bold">
+                          <h3 className="text-xl md:text-2xl font-bold">
                             Table {group.tableNumber}
                           </h3>
                           {group.orders.length > 1 && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5">
+                            <Badge variant="secondary" className="text-xs">
                               {group.orders.length} orders
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                        <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
                           <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-3.5 w-3.5" />
                             {getTimeAgo(group.latestOrderTime)}
                           </span>
                           <span>•</span>
@@ -576,9 +573,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-lg font-bold text-primary">
+                        <p className="text-xl md:text-2xl font-bold text-primary">
                           ₹{group.totalPrice.toFixed(0)}
                         </p>
                         {!group.allCompleted && (
@@ -592,11 +589,11 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                           </Badge>
                         )}
                       </div>
-                      <div className="p-1.5 rounded-full bg-muted/50">
+                      <div className="p-2 rounded-full bg-muted/50">
                         {isExpanded ? (
-                          <ChevronUp className="h-4 w-4" />
+                          <ChevronUp className="h-5 w-5" />
                         ) : (
-                          <ChevronDown className="h-4 w-4" />
+                          <ChevronDown className="h-5 w-5" />
                         )}
                       </div>
                     </div>
@@ -612,20 +609,20 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                       >
-                        <div className="px-3 pb-3 space-y-3 border-t">
+                        <div className="px-4 md:px-5 pb-4 md:pb-5 space-y-4 border-t">
                           {/* Combined Items Summary */}
-                          <div className="pt-3">
-                            <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-                              <Receipt className="h-3.5 w-3.5" />
+                          <div className="pt-4">
+                            <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                              <Receipt className="h-4 w-4" />
                               All Items Summary
                             </h4>
-                            <div className="bg-muted/30 rounded-xl p-2.5 space-y-1.5">
+                            <div className="bg-muted/30 rounded-xl p-4 space-y-2">
                               {group.allItems.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-xs">
-                                  <span className="flex items-center gap-1.5">
+                                <div key={idx} className="flex justify-between items-center text-sm">
+                                  <span className="flex items-center gap-2">
                                     <span className="font-medium">{item.name}</span>
                                     {item.selectedSize && (
-                                      <Badge variant="outline" className="text-[10px] px-1 py-0 bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30">
+                                      <Badge variant="outline" className="text-xs px-1.5 py-0 bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30">
                                         {item.selectedSize}
                                       </Badge>
                                     )}
@@ -634,7 +631,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                                   <span className="font-semibold">₹{(item.price * item.quantity).toFixed(0)}</span>
                                 </div>
                               ))}
-                              <div className="border-t pt-1.5 mt-1.5 flex justify-between font-bold text-sm">
+                              <div className="border-t pt-2 mt-2 flex justify-between font-bold">
                                 <span>Total</span>
                                 <span className="text-primary">₹{group.totalPrice.toFixed(0)}</span>
                               </div>
@@ -643,11 +640,11 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
                           {/* Individual Orders */}
                           <div>
-                            <h4 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
-                              <Package className="h-3.5 w-3.5" />
+                            <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                              <Package className="h-4 w-4" />
                               Individual Orders
                             </h4>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                               {group.orders.map((order) => {
                                 const isNew = newOrderIds.has(order.id);
                                 const isCompleted = order.status === 'completed';
@@ -655,33 +652,33 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                                 return (
                                   <Card 
                                     key={order.id} 
-                                    className={`p-2.5 ${
+                                    className={`p-4 ${
                                       isNew ? 'ring-2 ring-orange-500/50 bg-orange-500/5' : ''
                                     } ${isCompleted ? 'opacity-60' : ''}`}
                                   >
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                       <div className="flex-1">
-                                        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                                          {isNew && <Bell className="h-3.5 w-3.5 text-orange-500 animate-bounce" />}
-                                          <span className="font-bold text-sm">#{order.order_number}</span>
-                                          <Badge className={`${getStatusColor(order.status)} text-[10px]`} variant="outline">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                          {isNew && <Bell className="h-4 w-4 text-orange-500 animate-bounce" />}
+                                          <span className="font-bold">#{order.order_number}</span>
+                                          <Badge className={`${getStatusColor(order.status)} text-xs`} variant="outline">
                                             {order.status.toUpperCase()}
                                           </Badge>
-                                          <span className="text-[10px] text-muted-foreground">
+                                          <span className="text-xs text-muted-foreground">
                                             {formatTime(order.created_at)}
                                           </span>
                                         </div>
                                         
-                                        <div className="flex flex-wrap gap-1">
+                                        <div className="flex flex-wrap gap-1.5">
                                           {order.items?.items?.map((item: any, idx: number) => (
                                             <Badge 
                                               key={idx} 
                                               variant="secondary" 
-                                              className="text-[10px] font-normal px-1.5"
+                                              className="text-xs font-normal"
                                             >
                                               {item.name}
                                               {item.selectedSize && (
-                                                <span className="ml-0.5 text-violet-600 dark:text-violet-400">
+                                                <span className="ml-1 text-violet-600 dark:text-violet-400">
                                                   ({item.selectedSize})
                                                 </span>
                                               )}
@@ -692,12 +689,12 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                                       </div>
 
                                       {!isCompleted && (
-                                        <div className="flex gap-1.5">
+                                        <div className="flex gap-2">
                                           <Button
                                             size="sm"
                                             variant={order.status === 'preparing' ? 'default' : 'outline'}
                                             onClick={() => updateOrderStatus(order.id, 'preparing')}
-                                            className="text-[10px] h-7 px-2"
+                                            className="text-xs"
                                           >
                                             Preparing
                                           </Button>
@@ -705,9 +702,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                                             size="sm"
                                             variant="outline"
                                             onClick={() => updateOrderStatus(order.id, 'completed')}
-                                            className="text-[10px] h-7 px-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                            className="text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
                                           >
-                                            <CheckCircle2 className="h-3 w-3 mr-0.5" />
+                                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                                             Complete
                                           </Button>
                                         </div>
@@ -731,16 +728,16 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
       {/* Empty State */}
       {sessionGroups.length === 0 && (
-        <Card className="p-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-muted/50 flex items-center justify-center">
-            <Package className="h-6 w-6 text-muted-foreground" />
+        <Card className="p-12 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+            <Package className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-base font-semibold mb-1">
+          <h3 className="text-lg font-semibold mb-2">
             {activeTab === 'active' && 'No active orders'}
             {activeTab === 'completed' && 'No completed orders'}
             {activeTab === 'all' && 'No orders yet'}
           </h3>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {activeTab === 'active' && 'Active orders will appear here when customers place them'}
             {activeTab === 'completed' && 'Completed orders will appear here'}
             {activeTab === 'all' && 'Orders will appear here when customers place them'}
@@ -749,7 +746,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             <Button
               variant="outline"
               size="sm"
-              className="mt-3 h-7 text-xs"
+              className="mt-4"
               onClick={() => {
                 setSearchQuery('');
                 setDateFilter('all');

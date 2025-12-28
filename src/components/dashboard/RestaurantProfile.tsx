@@ -329,119 +329,119 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       {/* Restaurant Info Card */}
       <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
-              <Store className="h-4 w-4" />
+        <CardHeader className="bg-gradient-to-r from-orange-500 to-red-500 text-white pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+              <Store className="h-6 w-6" />
             </div>
             <div>
-              <CardTitle className="text-base">Restaurant Settings</CardTitle>
-              <CardDescription className="text-white/80 text-xs">
+              <CardTitle className="text-xl">Restaurant Settings</CardTitle>
+              <CardDescription className="text-white/80 text-sm">
                 Customize how customers see your restaurant
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-3 md:p-4 space-y-3">
+        <CardContent className="p-6 space-y-6">
           {/* Logo Section */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="relative flex-shrink-0">
               {logoUrl ? (
                 <div className="relative">
                   <img 
                     src={logoUrl} 
                     alt="Logo" 
-                    className="w-16 h-16 object-cover rounded-xl border-2 border-zinc-200 dark:border-zinc-700"
+                    className="w-24 h-24 object-cover rounded-2xl border-2 border-zinc-200 dark:border-zinc-700"
                   />
                   <Button
                     variant="destructive"
                     size="icon"
-                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full shadow-lg"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg"
                     onClick={handleRemoveLogo}
                   >
-                    <X className="h-2.5 w-2.5" />
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               ) : (
-                <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center">
-                  <ImageIcon className="h-6 w-6 text-zinc-400" />
+                <div className="w-24 h-24 bg-zinc-100 dark:bg-zinc-800 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center">
+                  <ImageIcon className="h-8 w-8 text-zinc-400" />
                 </div>
               )}
             </div>
             <div className="flex-1 w-full">
-              <Label className="text-xs font-medium mb-1 block">Restaurant Logo</Label>
+              <Label className="text-sm font-medium mb-2 block">Restaurant Logo</Label>
               <div className="relative">
                 <Input
                   type="file"
                   accept="image/*"
                   onChange={handleLogoUpload}
                   disabled={uploading}
-                  className="cursor-pointer text-xs h-8"
+                  className="cursor-pointer"
                 />
               </div>
               {uploading && (
-                <div className="mt-1.5">
-                  <div className="flex items-center gap-1.5 text-[10px] text-primary">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 text-xs text-primary">
+                    <Loader2 className="h-3 w-3 animate-spin" />
                     Uploading... {uploadProgress}%
                   </div>
-                  <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1 mt-1">
+                  <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-1.5 mt-1">
                     <div 
-                      className="bg-primary h-1 rounded-full transition-all"
+                      className="bg-primary h-1.5 rounded-full transition-all"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
                 </div>
               )}
-              <p className="text-[10px] text-zinc-500 mt-0.5">Square image, max 5MB</p>
+              <p className="text-xs text-zinc-500 mt-1">Square image, max 5MB</p>
             </div>
           </div>
 
           {/* Name Input */}
-          <div className="space-y-1">
-            <Label htmlFor="name" className="text-xs font-medium">Restaurant Name</Label>
+          <div className="space-y-2">
+            <Label htmlFor="name" className="text-sm font-medium">Restaurant Name</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your restaurant name"
               maxLength={100}
-              className="h-9 rounded-xl text-sm"
+              className="h-11 rounded-xl"
             />
           </div>
 
           {/* Description */}
-          <div className="space-y-1">
-            <Label htmlFor="description" className="text-xs font-medium">Description</Label>
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-sm font-medium">Description</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe your restaurant, cuisine type, specialties..."
-              rows={3}
+              rows={4}
               maxLength={500}
-              className="resize-none rounded-xl text-sm"
+              className="resize-none rounded-xl"
             />
-            <p className="text-[10px] text-zinc-500 text-right">{description.length}/500</p>
+            <p className="text-xs text-zinc-500 text-right">{description.length}/500</p>
           </div>
 
           {/* Save Button */}
           <Button 
             onClick={handleSave} 
             disabled={saving} 
-            className="w-full h-9 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium text-sm"
+            className="w-full h-11 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium"
           >
             {saving ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Saving...
               </>
             ) : (
               <>
-                <Save className="h-3.5 w-3.5 mr-1.5" />
+                <Save className="h-4 w-4 mr-2" />
                 Save Changes
               </>
             )}
@@ -451,33 +451,33 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
       {/* Feature Settings Card */}
       <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-        <CardHeader className="py-3 px-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-              <Settings className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+              <Settings className="h-6 w-6 text-violet-600 dark:text-violet-400" />
             </div>
             <div className="flex-1">
-              <CardTitle className="text-sm">Feature Settings</CardTitle>
-              <CardDescription className="text-xs">
+              <CardTitle className="text-lg">Feature Settings</CardTitle>
+              <CardDescription className="text-sm">
                 Control which features are available to customers
               </CardDescription>
             </div>
             {hasOrdersFeature && (
-              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30">
-                <Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-                <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">Advanced</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <Crown className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Advanced</span>
               </div>
             )}
           </div>
         </CardHeader>
-        <CardContent className="p-3 md:p-4 pt-0 space-y-2">
+        <CardContent className="p-6 pt-0 space-y-4">
           {!hasOrdersFeature ? (
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-              <div className="flex items-start gap-2">
-                <Crown className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+              <div className="flex items-start gap-3">
+                <Crown className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-amber-800 dark:text-amber-200 text-sm">Upgrade to Advanced Plan</p>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Upgrade to Advanced Plan</p>
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
                     Online ordering and waiter call features require the Advanced plan.
                   </p>
                 </div>
@@ -486,20 +486,20 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
           ) : (
             <>
               {/* Online Ordering Toggle */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-                <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-lg ${ordersEnabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
-                    <ShoppingCart className={`h-4 w-4 ${ordersEnabled ? 'text-green-600 dark:text-green-400' : 'text-zinc-500'}`} />
+              <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-lg ${ordersEnabled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                    <ShoppingCart className={`h-5 w-5 ${ordersEnabled ? 'text-green-600 dark:text-green-400' : 'text-zinc-500'}`} />
                   </div>
                   <div>
-                    <p className="font-medium text-xs">Online Ordering</p>
-                    <p className="text-[10px] text-zinc-500">
+                    <p className="font-medium">Online Ordering</p>
+                    <p className="text-sm text-zinc-500">
                       {ordersEnabled ? 'Customers can place orders' : 'Ordering disabled'}
                     </p>
                   </div>
                 </div>
                 {featureSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 ) : (
                   <Switch
                     checked={ordersEnabled}
@@ -510,20 +510,20 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
               </div>
 
               {/* Waiter Call Toggle */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-                <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-lg ${waiterCallEnabled ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
-                    <HandHelping className={`h-4 w-4 ${waiterCallEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500'}`} />
+              <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-lg ${waiterCallEnabled ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
+                    <HandHelping className={`h-5 w-5 ${waiterCallEnabled ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500'}`} />
                   </div>
                   <div>
-                    <p className="font-medium text-xs">Waiter Call</p>
-                    <p className="text-[10px] text-zinc-500">
+                    <p className="font-medium">Waiter Call</p>
+                    <p className="text-sm text-zinc-500">
                       {waiterCallEnabled ? 'Customers can request assistance' : 'Waiter call disabled'}
                     </p>
                   </div>
                 </div>
                 {featureSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 ) : (
                   <Switch
                     checked={waiterCallEnabled}
@@ -533,7 +533,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
                 )}
               </div>
 
-              <p className="text-[10px] text-zinc-500 text-center">
+              <p className="text-xs text-zinc-500 text-center">
                 💡 Changes take effect immediately for new customers
               </p>
             </>
@@ -543,53 +543,53 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
       {/* Push Notifications Card */}
       <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
-        <CardHeader className="py-3 px-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
               notificationSubscribed 
                 ? 'bg-green-100 dark:bg-green-900/30' 
                 : 'bg-zinc-100 dark:bg-zinc-800'
             }`}>
               {notificationSubscribed ? (
-                <BellRing className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <BellRing className="h-6 w-6 text-green-600 dark:text-green-400" />
               ) : (
-                <Bell className="h-4 w-4 text-zinc-500" />
+                <Bell className="h-6 w-6 text-zinc-500" />
               )}
             </div>
             <div className="flex-1">
-              <CardTitle className="text-sm">Push Notifications</CardTitle>
-              <CardDescription className="text-xs">
+              <CardTitle className="text-lg">Push Notifications</CardTitle>
+              <CardDescription className="text-sm">
                 Get instant alerts for new orders
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-3 md:p-4 pt-0 space-y-2">
+        <CardContent className="p-6 pt-0 space-y-4">
           {/* Status Banner */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`p-2.5 rounded-xl ${
+            className={`p-4 rounded-xl ${
               notificationSubscribed 
                 ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' 
                 : 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800'
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {notificationSubscribed ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-green-800 dark:text-green-200 text-xs">Push Notifications Active</p>
-                    <p className="text-[10px] text-green-600 dark:text-green-400">You'll receive order alerts on this device</p>
+                    <p className="font-medium text-green-800 dark:text-green-200">Push Notifications Active</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">You'll receive order alerts on this device</p>
                   </div>
                 </>
               ) : (
                 <>
-                  <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-amber-800 dark:text-amber-200 text-xs">Push Notifications Off</p>
-                    <p className="text-[10px] text-amber-600 dark:text-amber-400">Enable to get instant order alerts</p>
+                    <p className="font-medium text-amber-800 dark:text-amber-200">Push Notifications Off</p>
+                    <p className="text-sm text-amber-600 dark:text-amber-400">Enable to get instant order alerts</p>
                   </div>
                 </>
               )}
@@ -598,16 +598,16 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
           {/* Toggle Switch */}
           {isProductionDomain && notificationSupported && (
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
-              <div className="flex items-center gap-2">
-                <Bell className="h-4 w-4 text-zinc-500 flex-shrink-0" />
+            <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50">
+              <div className="flex items-center gap-3">
+                <Bell className="h-5 w-5 text-zinc-500 flex-shrink-0" />
                 <div>
-                  <p className="font-medium text-xs">Order Push Notifications</p>
-                  <p className="text-[10px] text-zinc-500">Browser push alerts for new orders</p>
+                  <p className="font-medium">Order Push Notifications</p>
+                  <p className="text-sm text-zinc-500">Browser push alerts for new orders</p>
                 </div>
               </div>
               {notificationLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
               ) : (
                 <Switch
                   checked={notificationSubscribed}
@@ -623,16 +623,16 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
             <Button 
               onClick={() => handleNotificationToggle(true)}
               disabled={notificationLoading}
-              className="w-full h-8 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-sm"
+              className="w-full h-11 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
             >
               {notificationLoading ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Enabling...
                 </>
               ) : (
                 <>
-                  <Bell className="h-3.5 w-3.5 mr-1.5" />
+                  <Bell className="h-4 w-4 mr-2" />
                   Enable Push Notifications
                 </>
               )}
@@ -641,10 +641,10 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
           {/* Not on production domain warning */}
           {!isProductionDomain && (
-            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start gap-1.5">
-                <AlertCircle className="h-3.5 w-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <p className="text-[10px] text-blue-700 dark:text-blue-300">
+            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-blue-700 dark:text-blue-300">
                   Push notifications are only available on <strong>addmenu.site</strong>. 
                   You're currently on {window.location.hostname}.
                 </p>
@@ -654,10 +654,10 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
           {/* Browser not supported warning */}
           {!notificationSupported && (
-            <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
-              <div className="flex items-start gap-1.5">
-                <BellOff className="h-3.5 w-3.5 text-red-600 mt-0.5 flex-shrink-0" />
-                <p className="text-[10px] text-red-700 dark:text-red-300">
+            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
+              <div className="flex items-start gap-3">
+                <BellOff className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-300">
                   Your browser doesn't support push notifications. Try Chrome, Firefox, or Edge.
                 </p>
               </div>
@@ -666,28 +666,28 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
 
           {/* How it works - Collapsible */}
           <details className="group">
-            <summary className="flex items-center justify-between cursor-pointer p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-              <span className="font-medium text-xs">How push notifications work</span>
-              <span className="text-zinc-400 group-open:rotate-180 transition-transform text-xs">▼</span>
+            <summary className="flex items-center justify-between cursor-pointer p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              <span className="font-medium">How push notifications work</span>
+              <span className="text-zinc-400 group-open:rotate-180 transition-transform">▼</span>
             </summary>
-            <div className="mt-2 space-y-2 pl-2">
+            <div className="mt-3 space-y-3 pl-3">
               {[
                 { step: "1", text: "Customer places an order via QR menu" },
                 { step: "2", text: "You get instant push notification on this device" },
                 { step: "3", text: "Tap notification to view order in dashboard" },
               ].map((item) => (
-                <div key={item.step} className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] font-bold text-orange-600">{item.step}</span>
+                <div key={item.step} className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-orange-600">{item.step}</span>
                   </div>
-                  <p className="text-[10px] text-zinc-600 dark:text-zinc-400">{item.text}</p>
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{item.text}</p>
                 </div>
               ))}
             </div>
           </details>
 
           {/* Note about in-app notifications */}
-          <p className="text-[10px] text-zinc-500 dark:text-zinc-400 text-center">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
             💡 In-app order notifications always work. Push notifications are for when you're not on the dashboard.
           </p>
         </CardContent>

@@ -125,28 +125,28 @@ const StatsOverview = ({ restaurantId }: StatsOverviewProps) => {
   ];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-xl md:text-2xl font-bold mb-0.5">Dashboard Overview</h2>
-        <p className="text-xs md:text-sm text-muted-foreground">Track your restaurant's performance at a glance</p>
+        <h2 className="text-2xl md:text-3xl font-bold mb-1">Dashboard Overview</h2>
+        <p className="text-sm text-muted-foreground">Track your restaurant's performance at a glance</p>
       </div>
 
-      <div className="grid gap-2 md:gap-3 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:gap-6 grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat, index) => (
           <Card 
             key={index} 
             className="hover:shadow-[var(--shadow-medium)] transition-all duration-300 hover:-translate-y-1"
           >
-            <CardHeader className="flex flex-row items-center justify-between pb-1 p-2.5 md:p-4">
-              <CardTitle className="text-xs font-medium text-muted-foreground">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 p-4 md:p-6">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <div className={`p-1.5 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={`h-3 w-3 md:h-4 md:w-4 ${stat.color}`} />
+              <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                <stat.icon className={`h-4 w-4 md:h-5 md:w-5 ${stat.color}`} />
               </div>
             </CardHeader>
-            <CardContent className="p-2.5 md:p-4 pt-0">
-              <div className="text-xl md:text-2xl font-bold">{stat.value}</div>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <div className="text-2xl md:text-3xl font-bold">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
