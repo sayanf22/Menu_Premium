@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, Save, Upload, X, Bell, BellOff, BellRing, 
-  Store, ImageIcon, CheckCircle2, AlertCircle, Settings, ShoppingCart, HandHelping, Crown
+  Store, ImageIcon, CheckCircle2, AlertCircle, Settings, ShoppingCart, HandHelping, Crown,
+  Sun, Moon, Monitor
 } from "lucide-react";
 import { uploadToR2WithProgress, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 import { motion } from "framer-motion";
@@ -41,12 +42,54 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [isProductionDomain, setIsProductionDomain] = useState(false);
   const [oneSignalReady, setOneSignalReady] = useState(false);
+  
+  // Theme state - dashboard only
+  const [dashboardTheme, setDashboardTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    const saved = localStorage.getItem('dashboard-theme');
+    return (saved as 'light' | 'dark' | 'system') || 'light';
+  });
 
   useEffect(() => {
     fetchRestaurantData();
     initializeNotifications();
     checkSubscriptionFeatures();
   }, [restaurantId]);
+
+  // Apply dashboard theme
+  useEffect(() => {
+    const applyTheme = (theme: 'light' | 'dark' | 'system') => {
+      const root = document.documentElement;
+      
+      if (theme === 'system') {
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        root.classList.toggle('dark', systemDark);
+      } else {
+        root.classList.toggle('dark', theme === 'dark');
+      }
+      
+      localStorage.setItem('dashboard-theme', theme);
+    };
+    
+    applyTheme(dashboardTheme);
+    
+    // Listen for system theme changes if using system preference
+    if (dashboardTheme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => {
+        document.documentElement.classList.toggle('dark', e.matches);
+      };
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, [dashboardTheme]);
+
+  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
+    setDashboardTheme(theme);
+    toast({
+      title: "Theme Updated",
+      description: `Dashboard theme set to ${theme}`,
+    });
+  };
 
   const checkSubscriptionFeatures = async () => {
     try {
@@ -689,6 +732,87 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
           {/* Note about in-app notifications */}
           <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
             💡 In-app order notifications always work. Push notifications are for when you're not on the dashboard.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Theme Settings Card */}
+      <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center">
+              {dashboardTheme === 'dark' ? (
+                <Moon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              ) : dashboardTheme === 'light' ? (
+                <Sun className="h-6 w-6 text-amber-500" />
+              ) : (
+                <Monitor className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              )}
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-lg">Appearance</CardTitle>
+              <CardDescription className="text-sm">
+                Customize dashboard theme (doesn't affect customer menu)
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 pt-0 space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            {/* Light Mode */}
+            <button
+              onClick={() => handleThemeChange('light')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                dashboardTheme === 'light'
+                  ? 'border-primary bg-primary/5 shadow-md'
+                  : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                dashboardTheme === 'light' ? 'bg-amber-100' : 'bg-zinc-100 dark:bg-zinc-800'
+              }`}>
+                <Sun className={`h-5 w-5 ${dashboardTheme === 'light' ? 'text-amber-500' : 'text-zinc-500'}`} />
+              </div>
+              <span className={`text-sm font-medium ${dashboardTheme === 'light' ? 'text-primary' : ''}`}>Light</span>
+            </button>
+
+            {/* Dark Mode */}
+            <button
+              onClick={() => handleThemeChange('dark')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                dashboardTheme === 'dark'
+                  ? 'border-primary bg-primary/5 shadow-md'
+                  : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                dashboardTheme === 'dark' ? 'bg-indigo-100 dark:bg-indigo-900/50' : 'bg-zinc-100 dark:bg-zinc-800'
+              }`}>
+                <Moon className={`h-5 w-5 ${dashboardTheme === 'dark' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-500'}`} />
+              </div>
+              <span className={`text-sm font-medium ${dashboardTheme === 'dark' ? 'text-primary' : ''}`}>Dark</span>
+            </button>
+
+            {/* System Mode */}
+            <button
+              onClick={() => handleThemeChange('system')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                dashboardTheme === 'system'
+                  ? 'border-primary bg-primary/5 shadow-md'
+                  : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                dashboardTheme === 'system' ? 'bg-purple-100 dark:bg-purple-900/50' : 'bg-zinc-100 dark:bg-zinc-800'
+              }`}>
+                <Monitor className={`h-5 w-5 ${dashboardTheme === 'system' ? 'text-purple-600 dark:text-purple-400' : 'text-zinc-500'}`} />
+              </div>
+              <span className={`text-sm font-medium ${dashboardTheme === 'system' ? 'text-primary' : ''}`}>System</span>
+            </button>
+          </div>
+
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+            💡 This setting only affects the dashboard. Customer menu has its own theme.
           </p>
         </CardContent>
       </Card>

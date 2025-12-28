@@ -68,6 +68,19 @@ const DashboardWithSidebar = () => {
   const serviceCallSoundRef = useRef<NodeJS.Timeout | null>(null);
   const serviceCallAudioRef = useRef<AudioContext | null>(null);
 
+  // Apply saved dashboard theme on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('dashboard-theme') as 'light' | 'dark' | 'system' | null;
+    const theme = savedTheme || 'light';
+    
+    if (theme === 'system') {
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', systemDark);
+    } else {
+      document.documentElement.classList.toggle('dark', theme === 'dark');
+    }
+  }, []);
+
   // Redirect to menu-only dashboard if user doesn't have orders feature
   useEffect(() => {
     if (!subscriptionLoading && subscription && !hasOrdersFeature) {
@@ -884,15 +897,15 @@ const DashboardWithSidebar = () => {
             {/* Policy Links */}
             <Link
               to="/terms"
-              className="flex items-center justify-start gap-2 group/sidebar py-2 cursor-pointer text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200"
+              className="flex items-center justify-start gap-2 group/sidebar py-2 cursor-pointer"
             >
-              <FileText className="h-4 w-4 flex-shrink-0" />
+              <FileText className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
               <motion.span
                 animate={{
                   display: open ? "inline-block" : "none",
                   opacity: open ? 1 : 0,
                 }}
-                className="text-xs group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+                className="text-neutral-700 dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
               >
                 Terms & Policies
               </motion.span>
@@ -1022,7 +1035,7 @@ const Dashboard = ({
     <div className="flex flex-1 overflow-hidden">
       <div className="p-4 md:p-8 lg:p-10 md:rounded-tl-2xl border-t md:border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex-1 w-full overflow-y-auto">
         {/* Centered content container with max-width */}
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto w-full">
           {activeTab === "stats" && <StatsOverview restaurantId={restaurantId} />}
           {activeTab === "menu" && <MenuManagement restaurantId={restaurantId} />}
           
