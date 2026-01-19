@@ -33,6 +33,7 @@ import RestaurantProfile from "@/components/dashboard/RestaurantProfile";
 import SubscriptionManagement from "@/components/dashboard/SubscriptionManagement";
 import ServiceCallsPanel from "@/components/dashboard/ServiceCallsPanel";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useBusinessType } from "@/hooks/useBusinessType";
 
 interface ServiceCall {
   id: string;
@@ -48,6 +49,7 @@ const MenuOnlyDashboard = () => {
   const { subscription, hasOrdersFeature, refreshSubscription } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const { locationLabel } = useBusinessType(restaurantId);
   const [restaurantName, setRestaurantName] = useState("");
   const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
   const [isRestaurantDisabled, setIsRestaurantDisabled] = useState(false);
@@ -118,7 +120,7 @@ const MenuOnlyDashboard = () => {
       onClick: () => handleTabChange("subscription"),
     },
     {
-      label: "Profile",
+      label: "Settings",
       href: "#profile",
       icon: <Settings className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />,
       onClick: () => handleTabChange("profile"),
@@ -191,7 +193,7 @@ const MenuOnlyDashboard = () => {
           
           toast({
             title: `🔔 ${newCall.call_type.charAt(0).toUpperCase() + newCall.call_type.slice(1)} Request!`,
-            description: `Table ${newCall.table_number} needs ${newCall.call_type}`,
+            description: `${locationLabel} ${newCall.table_number} needs ${newCall.call_type}`,
             duration: 10000,
           });
           
@@ -415,7 +417,7 @@ const MenuOnlyDashboard = () => {
                 </div>
                 <div>
                   <CardTitle className="text-lg md:text-xl">🔔 {serviceCallNotification.call_type.charAt(0).toUpperCase() + serviceCallNotification.call_type.slice(1)} Request!</CardTitle>
-                  <p className="text-xs md:text-sm text-muted-foreground">Table {serviceCallNotification.table_number}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">{locationLabel} {serviceCallNotification.table_number}</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={dismissServiceCallNotification} className="h-8 w-8">
@@ -432,7 +434,7 @@ const MenuOnlyDashboard = () => {
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Table Number:</span>
+                <span className="text-sm font-medium">{locationLabel} Number:</span>
                 <Badge variant="default" className="text-sm md:text-base px-2 md:px-3 py-1">
                   {serviceCallNotification.table_number}
                 </Badge>

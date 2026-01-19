@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useBusinessType } from "@/hooks/useBusinessType";
 import { Bell, User, Droplets, Receipt, Check, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -31,6 +32,7 @@ const CALL_CONFIG = {
 
 const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) => {
   const { toast } = useToast();
+  const { locationLabel } = useBusinessType(restaurantId);
   const [calls, setCalls] = useState<ServiceCall[]>([]);
   const [loading, setLoading] = useState(true);
   const channelRef = useRef<any>(null);
@@ -102,7 +104,7 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
             
             toast({
               title: `🔔 ${CALL_CONFIG[newCall.call_type].label} Request!`,
-              description: `Table ${newCall.table_number} needs ${newCall.call_type}`,
+              description: `${locationLabel} ${newCall.table_number} needs ${newCall.call_type}`,
               duration: 10000,
             });
 
@@ -353,7 +355,7 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-lg">Table {call.table_number}</span>
+                              <span className="font-bold text-lg">{locationLabel} {call.table_number}</span>
                               <Badge variant="destructive" className="animate-pulse">
                                 {CALL_CONFIG[call.call_type].label}
                               </Badge>

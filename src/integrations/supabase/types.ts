@@ -477,6 +477,7 @@ export type Database = {
       }
       restaurants: {
         Row: {
+          business_type: string
           created_at: string
           description: string | null
           email: string
@@ -494,6 +495,7 @@ export type Database = {
           waiter_call_enabled: boolean
         }
         Insert: {
+          business_type?: string
           created_at?: string
           description?: string | null
           email: string
@@ -511,6 +513,7 @@ export type Database = {
           waiter_call_enabled?: boolean
         }
         Update: {
+          business_type?: string
           created_at?: string
           description?: string | null
           email?: string

@@ -10,10 +10,20 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Loader2, Save, Upload, X, Bell, BellOff, BellRing, 
   Store, ImageIcon, CheckCircle2, AlertCircle, Settings, ShoppingCart, HandHelping, Crown,
-  Sun, Moon, Monitor
+  Sun, Moon, Monitor, Building2, Hotel
 } from "lucide-react";
 import { uploadToR2WithProgress, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 import { motion } from "framer-motion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface RestaurantProfileProps {
   restaurantId: string;
@@ -48,6 +58,13 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
     const saved = localStorage.getItem('dashboard-theme');
     return (saved as 'light' | 'dark' | 'system') || 'light';
   });
+  
+  // Business type state
+  const [businessType, setBusinessType] = useState<'restaurant' | 'hotel'>('restaurant');
+  const [businessTypeSaving, setBusinessTypeSaving] = useState(false);
+  const [showBusinessTypeDialog, setShowBusinessTypeDialog] = useState(false);
+  const [pendingBusinessType, setPendingBusinessType] = useState<'restaurant' | 'hotel' | null>(null);
+  const [confirmText, setConfirmText] = useState("");
 
   useEffect(() => {
     fetchRestaurantData();
@@ -91,6 +108,72 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
     });
   };
 
+  const handleBusinessTypeChange = async (type: 'restaurant' | 'hotel') => {
+    // If clicking the same type, do nothing
+    if (type === businessType) return;
+    
+    // Show confirmation dialog
+    setPendingBusinessType(type);
+    setShowBusinessTypeDialog(true);
+  };
+
+  const confirmBusinessTypeChange = async () => {
+    if (!pendingBusinessType) return;
+    
+    // Check if user typed "CONFIRM"
+    if (confirmText.toUpperCase() !== "CONFIRM") {
+      toast({
+        title: "Invalid Confirmation",
+        description: 'Please type "CONFIRM" to proceed',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setBusinessTypeSaving(true);
+      
+      const { error } = await supabase
+        .from("restaurants")
+        .update({ business_type: pendingBusinessType })
+        .eq("id", restaurantId);
+
+      if (error) throw error;
+
+      setBusinessType(pendingBusinessType);
+      
+      toast({
+        title: "✅ Business Type Updated",
+        description: `Changed to ${pendingBusinessType === 'hotel' ? 'Hotel' : 'Restaurant'} mode. Page will reload to apply changes.`,
+        duration: 3000,
+      });
+
+      // Close dialog and reset
+      setShowBusinessTypeDialog(false);
+      setConfirmText("");
+      setPendingBusinessType(null);
+
+      // Reload page to apply changes throughout the app
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update business type",
+        variant: "destructive",
+      });
+    } finally {
+      setBusinessTypeSaving(false);
+    }
+  };
+
+  const cancelBusinessTypeChange = () => {
+    setShowBusinessTypeDialog(false);
+    setConfirmText("");
+    setPendingBusinessType(null);
+  };
+
   const checkSubscriptionFeatures = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -110,7 +193,7 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       setLoading(true);
       const { data, error } = await supabase
         .from("restaurants")
-        .select("name, description, logo_url, orders_enabled, waiter_call_enabled")
+        .select("name, description, logo_url, orders_enabled, waiter_call_enabled, business_type")
         .eq("id", restaurantId)
         .single();
 
@@ -122,6 +205,8 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
       setOriginalLogoUrl(data.logo_url || null);
       setOrdersEnabled(data.orders_enabled ?? true);
       setWaiterCallEnabled(data.waiter_call_enabled ?? true);
+      const type = data.business_type as 'restaurant' | 'hotel';
+      setBusinessType(type || 'restaurant');
     } catch (error: any) {
       toast({
         title: "Error",
@@ -816,6 +901,137 @@ const RestaurantProfile = ({ restaurantId }: RestaurantProfileProps) => {
           </p>
         </CardContent>
       </Card>
+
+      {/* Business Type Card */}
+      <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
+              {businessType === 'hotel' ? (
+                <Hotel className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              ) : (
+                <Building2 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              )}
+            </div>
+            <div className="flex-1">
+              <CardTitle className="text-lg">Business Type</CardTitle>
+              <CardDescription className="text-sm">
+                Choose Restaurant or Hotel mode
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6 pt-0 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Restaurant Option */}
+            <button
+              onClick={() => handleBusinessTypeChange('restaurant')}
+              disabled={businessTypeSaving}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                businessType === 'restaurant'
+                  ? 'border-primary bg-primary/5 shadow-md'
+                  : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+              } ${businessTypeSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                businessType === 'restaurant' ? 'bg-orange-100 dark:bg-orange-900/50' : 'bg-zinc-100 dark:bg-zinc-800'
+              }`}>
+                <Building2 className={`h-5 w-5 ${businessType === 'restaurant' ? 'text-orange-600 dark:text-orange-400' : 'text-zinc-500'}`} />
+              </div>
+              <div className="text-center">
+                <span className={`text-sm font-medium block ${businessType === 'restaurant' ? 'text-primary' : ''}`}>Restaurant</span>
+                <span className="text-xs text-zinc-500">Table Number</span>
+              </div>
+            </button>
+
+            {/* Hotel Option */}
+            <button
+              onClick={() => handleBusinessTypeChange('hotel')}
+              disabled={businessTypeSaving}
+              className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                businessType === 'hotel'
+                  ? 'border-primary bg-primary/5 shadow-md'
+                  : 'border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+              } ${businessTypeSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                businessType === 'hotel' ? 'bg-blue-100 dark:bg-blue-900/50' : 'bg-zinc-100 dark:bg-zinc-800'
+              }`}>
+                <Hotel className={`h-5 w-5 ${businessType === 'hotel' ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-500'}`} />
+              </div>
+              <div className="text-center">
+                <span className={`text-sm font-medium block ${businessType === 'hotel' ? 'text-primary' : ''}`}>Hotel</span>
+                <span className="text-xs text-zinc-500">Room Number</span>
+              </div>
+            </button>
+          </div>
+
+          {businessTypeSaving && (
+            <div className="flex items-center justify-center gap-2 text-sm text-primary">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Saving and reloading...</span>
+            </div>
+          )}
+
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+            💡 Changes "Table Number" to "Room Number" throughout the app
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Business Type Confirmation Dialog */}
+      <AlertDialog open={showBusinessTypeDialog} onOpenChange={setShowBusinessTypeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Confirm Business Type Change
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                You are about to change your business type from{" "}
+                <strong>{businessType === 'restaurant' ? 'Restaurant' : 'Hotel'}</strong> to{" "}
+                <strong>{pendingBusinessType === 'restaurant' ? 'Restaurant' : 'Hotel'}</strong>.
+              </p>
+              <p className="text-amber-600 dark:text-amber-400 font-medium">
+                This will change all "{businessType === 'restaurant' ? 'Table' : 'Room'}" labels to "{pendingBusinessType === 'restaurant' ? 'Table' : 'Room'}" throughout your dashboard and customer menu.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-text" className="text-sm font-medium">
+                  Type <span className="font-bold text-primary">CONFIRM</span> to proceed:
+                </Label>
+                <Input
+                  id="confirm-text"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder="Type CONFIRM"
+                  className="font-mono"
+                  autoComplete="off"
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelBusinessTypeChange} disabled={businessTypeSaving}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBusinessTypeChange}
+              disabled={businessTypeSaving || confirmText.toUpperCase() !== "CONFIRM"}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {businessTypeSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Changing...
+                </>
+              ) : (
+                "Confirm Change"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -35,6 +35,7 @@ import RestaurantProfile from "@/components/dashboard/RestaurantProfile";
 import SubscriptionManagement from "@/components/dashboard/SubscriptionManagement";
 import ServiceCallsPanel from "@/components/dashboard/ServiceCallsPanel";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useBusinessType } from "@/hooks/useBusinessType";
 
 interface Order {
   id: string;
@@ -60,6 +61,7 @@ const DashboardWithSidebar = () => {
   const { subscription, hasOrdersFeature, loading: subscriptionLoading } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const { locationLabel } = useBusinessType(restaurantId);
   const [restaurantName, setRestaurantName] = useState("");
   const [restaurantLogo, setRestaurantLogo] = useState<string | null>(null);
   const [newOrdersCount, setNewOrdersCount] = useState(0);
@@ -305,7 +307,7 @@ const DashboardWithSidebar = () => {
                 
                 toast({
                   title: "🔔 New Order!",
-                  description: `Order #${order.order_number} from Table ${order.table_number}`,
+                  description: `Order #${order.order_number} from ${locationLabel} ${order.table_number}`,
                   duration: 10000,
                 });
               });
@@ -393,7 +395,7 @@ const DashboardWithSidebar = () => {
           
           toast({
             title: `🔔 ${newCall.call_type.charAt(0).toUpperCase() + newCall.call_type.slice(1)} Request!`,
-            description: `Table ${newCall.table_number} needs ${newCall.call_type}`,
+            description: `${locationLabel} ${newCall.table_number} needs ${newCall.call_type}`,
             duration: 10000,
           });
           
@@ -547,7 +549,7 @@ const DashboardWithSidebar = () => {
     
     toast({
       title: "🔔 New Order!",
-      description: `Order #${order.order_number} from Table ${order.table_number}`,
+      description: `Order #${order.order_number} from ${locationLabel} ${order.table_number}`,
       duration: 10000,
     });
     
@@ -791,7 +793,7 @@ const DashboardWithSidebar = () => {
           <CardContent className="pt-3 p-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Table Number:</span>
+                <span className="text-sm font-medium">{locationLabel} Number:</span>
                 <Badge variant="default" className="text-sm md:text-base px-2 md:px-3 py-1">
                   {newOrderNotification.table_number}
                 </Badge>
@@ -835,7 +837,7 @@ const DashboardWithSidebar = () => {
                 </div>
                 <div>
                   <CardTitle className="text-lg md:text-xl">🔔 {serviceCallNotification.call_type.charAt(0).toUpperCase() + serviceCallNotification.call_type.slice(1)} Request!</CardTitle>
-                  <p className="text-xs md:text-sm text-muted-foreground">Table {serviceCallNotification.table_number}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">{locationLabel} {serviceCallNotification.table_number}</p>
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={dismissServiceCallNotification} className="h-8 w-8">
@@ -852,7 +854,7 @@ const DashboardWithSidebar = () => {
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Table Number:</span>
+                <span className="text-sm font-medium">{locationLabel} Number:</span>
                 <Badge variant="default" className="text-sm md:text-base px-2 md:px-3 py-1">
                   {serviceCallNotification.table_number}
                 </Badge>

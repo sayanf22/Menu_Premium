@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useBusinessType } from "@/hooks/useBusinessType";
 import { 
   Clock, Package, Bell, RefreshCw, ChevronDown, ChevronUp, 
   Users, ShoppingBag, Receipt, CheckCircle2, Timer, Utensils,
@@ -49,6 +50,7 @@ const GROUPING_WINDOW_MS = 90 * 60 * 1000; // 90 minutes
 
 const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderManagementProps) => {
   const { toast } = useToast();
+  const { locationLabel, locationLabelLower } = useBusinessType(restaurantId);
   const [orders, setOrders] = useState<Order[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
@@ -457,7 +459,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by order #, table, or item..."
+              placeholder={`Search by order #, ${locationLabelLower}, or item...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-10"
@@ -548,7 +550,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-xl md:text-2xl font-bold">
-                            Table {group.tableNumber}
+                            {locationLabel} {group.tableNumber}
                           </h3>
                           {group.orders.length > 1 && (
                             <Badge variant="secondary" className="text-xs">

@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { isRateLimited, RATE_LIMITS, isValidUUID, isValidTableNumber, sanitizeInput, getClientFingerprint } from "@/lib/security";
 import { registerReconnectCallback, unregisterReconnectCallback } from "@/lib/realtimeOptimization";
 import ServiceCallButton from "@/components/ServiceCallButton";
+import { useBusinessType } from "@/hooks/useBusinessType";
 
 // Animation configs
 const springConfig = { type: "spring" as const, stiffness: 400, damping: 30 };
@@ -143,6 +144,7 @@ const CookingAnimation = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
 const CustomerMenu = () => {
   const { restaurantId } = useParams();
   const { toast } = useToast();
+  const { locationLabel, locationLabelLower } = useBusinessType(restaurantId || null);
   const [cart, setCart] = useState<any[]>([]);
   const [tableNumber, setTableNumber] = useState("");
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
@@ -525,11 +527,11 @@ const CustomerMenu = () => {
     if (isPlacingOrder) return;
     
     if (!tableNumber || cart.length === 0) {
-      toast({ title: "Missing information", description: "Please enter table number and add items", variant: "destructive" });
+      toast({ title: "Missing information", description: `Please enter ${locationLabelLower} number and add items`, variant: "destructive" });
       return;
     }
     if (!isValidTableNumber(tableNumber)) {
-      toast({ title: "Invalid table number", description: "Table number must be alphanumeric (max 10 chars)", variant: "destructive" });
+      toast({ title: `Invalid ${locationLabelLower} number`, description: `${locationLabel} number must be alphanumeric (max 10 chars)`, variant: "destructive" });
       return;
     }
     if (!restaurantId || !isValidUUID(restaurantId)) {
@@ -1366,11 +1368,11 @@ const CustomerMenu = () => {
               <span className="text-2xl font-bold text-zinc-900 dark:text-white">{formatINR(totalPrice)}</span>
             </div>
             <div>
-              <Label className="text-sm text-zinc-500 dark:text-zinc-400">Table Number</Label>
+              <Label className="text-sm text-zinc-500 dark:text-zinc-400">{locationLabel} Number</Label>
               <Input 
                 value={tableNumber} 
                 onChange={(e) => setTableNumber(e.target.value)} 
-                placeholder="Enter table number" 
+                placeholder={`Enter ${locationLabelLower} number`} 
                 className="mt-1.5 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400" 
               />
             </div>
@@ -1414,7 +1416,7 @@ const CustomerMenu = () => {
                   <CookingAnimation size="lg" />
                 </div>
                 <h3 className="text-2xl font-bold text-white">Cooking Your Food</h3>
-                <p className="text-white/80 mt-2">Table {activeOrders[0]?.table_number}</p>
+                <p className="text-white/80 mt-2">{locationLabel} {activeOrders[0]?.table_number}</p>
               </>
             )}
           </div>
@@ -1469,7 +1471,7 @@ const CustomerMenu = () => {
             </motion.div>
             <h2 className="text-2xl font-bold text-white mb-2">Order Placed!</h2>
             <p className="text-4xl font-bold text-white">#{orderNumber}</p>
-            <p className="text-white/80 mt-2">Table {tableNumber}</p>
+            <p className="text-white/80 mt-2">{locationLabel} {tableNumber}</p>
           </div>
           <div className="p-6 bg-white dark:bg-zinc-950">
             <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl mb-4 flex items-center justify-center gap-3">
@@ -1571,7 +1573,7 @@ const CustomerMenu = () => {
               </div>
             </div>
             <p className="text-xs text-orange-500 dark:text-orange-400/70 mt-2">
-              Table {tableNumber} • Session expires in ~{remainingMinutes || 90} min
+              {locationLabel} {tableNumber} • Session expires in ~{remainingMinutes || 90} min
             </p>
           </div>
 
