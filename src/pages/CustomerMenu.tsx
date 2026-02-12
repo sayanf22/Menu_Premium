@@ -234,70 +234,99 @@ const CustomerMenu = () => {
   // Subscription expired state
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
-  // Queries
-  const { data: restaurant } = useQuery({
-    queryKey: ['restaurant', restaurantId],
+  // OPTIMIZED: Single combined query for all data
+  const { data: menuData, isLoading: isLoadingMenu } = useQuery({
+    queryKey: ['menuData', restaurantId],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("restaurants")
-        .select("social_links, name, description, logo_url, is_active, email, phone, orders_enabled, waiter_call_enabled")
-        .eq("id", restaurantId)
-        .maybeSingle();
-      if (data && !data.is_active) {
+      // Fetch all data in parallel for faster loading
+      const [restaurantResult, menuItemsResult, categoriesResult, subStatusResult] = await Promise.all([
+        supabase
+          .from("restaurants")
+          .select("social_links, name, description, logo_url, is_active, email, phone, orders_enabled, waiter_call_enabled")
+          .eq("id", restaurantId)
+          .maybeSingle(),
+        supabase
+          .from("menu_items")
+          .select("id, restaurant_id, name, description, price, image_url, is_available, category_id, has_size_variants, size_variants")
+          .eq("restaurant_id", restaurantId)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("menu_categories")
+          .select("id, restaurant_id, name, display_order")
+          .eq("restaurant_id", restaurantId)
+          .order("display_order", { ascending: true }),
+        restaurantId ? supabase.rpc("get_restaurant_subscription_status" as any, { p_restaurant_id: restaurantId }) : Promise.resolve({ data: null })
+      ]);
+
+      const restaurant = restaurantResult.data;
+      const menuItems = menuItemsResult.data || [];
+      const categories = categoriesResult.data || [];
+      const subStatus = subStatusResult.data as any[];
+
+      // Check restaurant status
+      if (restaurant && !restaurant.is_active) {
         setServiceDisabled(true);
-        setRestaurantContact({ name: data.name, email: data.email, phone: data.phone });
+        setRestaurantContact({ name: restaurant.name, email: restaurant.email, phone: restaurant.phone });
       }
-      // Check subscription status using database function
-      if (restaurantId) {
-        const { data: subStatus } = await supabase
-          .rpc("get_restaurant_subscription_status" as any, { p_restaurant_id: restaurantId });
-        const statusArray = subStatus as any[];
-        // Block if no subscription OR subscription is not active
-        if (!statusArray || statusArray.length === 0 || !statusArray[0].is_subscription_active) {
-          setSubscriptionExpired(true);
-          setRestaurantContact({ name: data?.name, email: data?.email, phone: data?.phone });
-        }
+
+      // Check subscription status
+      if (!subStatus || subStatus.length === 0 || !subStatus[0]?.is_subscription_active) {
+        setSubscriptionExpired(true);
+        setRestaurantContact({ name: restaurant?.name, email: restaurant?.email, phone: restaurant?.phone });
       }
-      return data;
+
+      return { restaurant, menuItems, categories };
     },
-    staleTime: 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - reduced for fresher data
+    gcTime: 60 * 60 * 1000, // 1 hour
     enabled: !!restaurantId,
+    retry: 2, // Retry failed requests
+    retryDelay: 1000, // Wait 1s between retries
   });
+
+  // Extract data from combined query
+  const restaurant = menuData?.restaurant;
+  const menuItems = menuData?.menuItems || [];
+  const categories = menuData?.categories || [];
+  const isLoadingItems = isLoadingMenu;
 
   // Check if ordering is enabled
   const ordersEnabled = restaurant?.orders_enabled !== false;
   const waiterCallEnabled = restaurant?.waiter_call_enabled !== false;
 
-  const { data: menuItems = [], isLoading: isLoadingItems } = useQuery({
-    queryKey: ['menuItems', restaurantId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("menu_items")
-        .select("id, restaurant_id, name, description, price, image_url, is_available, category_id, has_size_variants, size_variants")
-        .eq("restaurant_id", restaurantId)
-        .order("created_at", { ascending: true });
-      return data || [];
-    },
-    staleTime: 60 * 60 * 1000,
-    gcTime: 180 * 24 * 60 * 60 * 1000,
-    enabled: !!restaurantId,
-  });
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories', restaurantId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("menu_categories")
-        .select("id, restaurant_id, name, display_order")
-        .eq("restaurant_id", restaurantId)
-        .order("display_order", { ascending: true });
-      return data || [];
-    },
-    staleTime: 60 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-    enabled: !!restaurantId,
-  });
+  // Show loading state while data is being fetched
+  if (isLoadingMenu && !menuData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-500 via-red-500 to-pink-500">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="text-center"
+        >
+          <div className="mb-6">
+            <CookingAnimation size="lg" />
+          </div>
+          <motion.h2 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-2xl font-bold text-white mb-2"
+          >
+            Loading Menu...
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-white/80"
+          >
+            Preparing delicious options for you
+          </motion.p>
+        </motion.div>
+      </div>
+    );
+  }
 
   const incrementViewMutation = useMutation({
     mutationFn: async () => {
