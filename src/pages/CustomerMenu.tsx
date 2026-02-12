@@ -234,28 +234,29 @@ const CustomerMenu = () => {
   // Subscription expired state
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
-  // Queries - Keep separate for better cache management and React Query best practices
+  // Production-optimized queries with proper cache management
   const { data: restaurant, isLoading: isLoadingRestaurant } = useQuery({
     queryKey: ['restaurant', restaurantId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("restaurants")
         .select("social_links, name, description, logo_url, is_active, email, phone, orders_enabled, waiter_call_enabled")
         .eq("id", restaurantId)
-        .maybeSingle();
+        .single();
+      
+      if (error) throw error;
       
       if (data && !data.is_active) {
         setServiceDisabled(true);
         setRestaurantContact({ name: data.name, email: data.email, phone: data.phone });
       }
       
-      // Check subscription status using database function
+      // Check subscription status
       if (restaurantId) {
         const { data: subStatus } = await supabase
           .rpc("get_restaurant_subscription_status" as any, { p_restaurant_id: restaurantId });
         const statusArray = subStatus as any[];
         
-        // Block if no subscription OR subscription is not active
         if (!statusArray || statusArray.length === 0 || !statusArray[0].is_subscription_active) {
           setSubscriptionExpired(true);
           setRestaurantContact({ name: data?.name, email: data?.email, phone: data?.phone });
@@ -264,52 +265,61 @@ const CustomerMenu = () => {
       
       return data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes - industry standard for semi-static data
-    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
     enabled: !!restaurantId,
-    refetchOnWindowFocus: false, // Don't refetch on window focus for better mobile performance
-    refetchOnReconnect: true, // Refetch when network reconnects
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Check if ordering is enabled
   const ordersEnabled = restaurant?.orders_enabled !== false;
   const waiterCallEnabled = restaurant?.waiter_call_enabled !== false;
 
   const { data: menuItems = [], isLoading: isLoadingItems } = useQuery({
     queryKey: ['menuItems', restaurantId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("menu_items")
         .select("id, restaurant_id, name, description, price, image_url, is_available, category_id, has_size_variants, size_variants")
         .eq("restaurant_id", restaurantId)
+        .eq("is_available", true) // Only fetch available items for customers
         .order("created_at", { ascending: true });
+      
+      if (error) throw error;
       return data || [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 3 * 60 * 1000, // 3 minutes - shorter for menu items
+    gcTime: 30 * 60 * 1000,
     enabled: !!restaurantId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
   const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories', restaurantId],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("menu_categories")
         .select("id, restaurant_id, name, display_order")
         .eq("restaurant_id", restaurantId)
         .order("display_order", { ascending: true });
+      
+      if (error) throw error;
       return data || [];
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     enabled: !!restaurantId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 
-  // Combined loading state
   const isLoading = isLoadingRestaurant || isLoadingItems || isLoadingCategories;
 
   const incrementViewMutation = useMutation({

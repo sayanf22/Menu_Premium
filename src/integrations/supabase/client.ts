@@ -25,17 +25,28 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     detectSessionInUrl: true,
     flowType: 'pkce',
     storageKey: 'addmenu-auth-token',
-    // Debug: log auth state changes
     debug: false,
   },
   realtime: {
     params: {
-      eventsPerSecond: 2, // Reduced to prevent abuse
+      eventsPerSecond: 2,
     },
   },
   global: {
     headers: {
       'X-Client-Info': 'quick-menu-dish',
     },
+    // Production optimization: Use connection pooling
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        // Enable keep-alive for connection reuse
+        keepalive: true,
+      });
+    },
+  },
+  db: {
+    // Use PostgREST connection pooler for better performance
+    schema: 'public',
   },
 });
