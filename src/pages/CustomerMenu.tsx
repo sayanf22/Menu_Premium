@@ -371,8 +371,8 @@ const CustomerMenu = () => {
   useEffect(() => {
     if (activeOrders.length === 0 || !restaurantId) return;
     
-    const hasIncomplete = activeOrders.some(o => o.status !== 'completed');
-    if (!hasIncomplete) return; // Stop polling once all orders are completed
+    const isAllDone = activeOrders.every(o => ['completed', 'rejected', 'cancelled'].includes(o.status));
+    if (isAllDone) return; // Stop polling once all orders are in a terminal state
 
     const pollOrders = async () => {
       const orderIdsStr = localStorage.getItem(`orders_${restaurantId}_${sessionId}`);
@@ -384,7 +384,7 @@ const CustomerMenu = () => {
         setCurrentOrder(orders[orders.length - 1]);
         // Only show feedback ONCE when all orders complete - use ref to check
         if (orders.every(o => o.status === 'completed') && !feedbackDismissedRef.current) {
-          feedbackDismissedRef.current = true; // Prevent showing again
+          feedbackDismissedRef.current = true;
           setFeedbackDismissed(true);
           setTimeout(() => setShowFeedback(true), 500);
         }
@@ -459,7 +459,7 @@ const CustomerMenu = () => {
             const updated = prev.map(order => order.id === payload.new.id ? { ...payload.new } : order);
             // Only show feedback ONCE when all orders complete
             if (updated.every(o => o.status === 'completed') && !feedbackDismissedRef.current) {
-              feedbackDismissedRef.current = true; // Prevent showing again
+              feedbackDismissedRef.current = true;
               setFeedbackDismissed(true);
               setTimeout(() => setShowFeedback(true), 500);
             }
@@ -470,6 +470,15 @@ const CustomerMenu = () => {
           if (payload.new.status === "completed" && payload.old?.status !== "completed") {
             if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
             toast({ title: "🎉 Order Complete!", description: `Order #${payload.new.order_number} is being served!`, duration: 8000 });
+          } else if (payload.new.status === "accepted" && payload.old?.status === "pending") {
+            toast({ title: "✅ Order Accepted!", description: `Order #${payload.new.order_number} is being prepared!`, duration: 6000 });
+          } else if (payload.new.status === "preparing" && payload.old?.status === "accepted") {
+            toast({ title: "👨‍🍳 Preparing Your Order", description: `Order #${payload.new.order_number} is now being cooked!`, duration: 5000 });
+          } else if (payload.new.status === "rejected") {
+            if ('vibrate' in navigator) navigator.vibrate([300, 100, 300]);
+            toast({ title: "❌ Order Rejected", description: `Order #${payload.new.order_number} was rejected. Please contact staff.`, variant: "destructive", duration: 10000 });
+          } else if (payload.new.status === "cancelled") {
+            toast({ title: "🚫 Order Cancelled", description: `Order #${payload.new.order_number} was cancelled.`, variant: "destructive", duration: 8000 });
           }
         })
         .subscribe((status, err) => {
@@ -589,7 +598,7 @@ const CustomerMenu = () => {
       // Add timeout to prevent hanging requests
       const orderPromise = supabase
         .from("orders")
-        .insert([{ restaurant_id: restaurantId, table_number: tableNumber, items: { items: orderItems }, order_number: orderNum, status: 'preparing', session_id: sessionId }])
+        .insert([{ restaurant_id: restaurantId, table_number: tableNumber, items: { items: orderItems }, order_number: orderNum, status: 'pending', session_id: sessionId }])
         .select()
         .single();
 
@@ -1247,7 +1256,13 @@ const CustomerMenu = () => {
               className={`w-full ${
                 activeOrders.every(o => o.status === "completed")
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
-                  : 'bg-gradient-to-r from-amber-500 to-orange-500'
+                  : activeOrders.some(o => o.status === "rejected" || o.status === "cancelled")
+                    ? 'bg-gradient-to-r from-red-500 to-rose-500'
+                    : activeOrders.some(o => o.status === "preparing")
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500'
+                      : activeOrders.some(o => o.status === "accepted")
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-500'
+                        : 'bg-gradient-to-r from-amber-500 to-orange-500'
               }`}
             >
               {/* Main status row */}
@@ -1267,7 +1282,17 @@ const CustomerMenu = () => {
                       {activeOrders.length === 1 ? `Order #${activeOrders[0].order_number}` : `${activeOrders.length} Orders`}
                     </p>
                     <p className="text-sm opacity-90">
-                      {activeOrders.every(o => o.status === "completed") ? '✓ Enjoy your meal!' : 'Cooking your food...'}
+                      {activeOrders.every(o => o.status === "completed")
+                        ? '✓ Enjoy your meal!'
+                        : activeOrders.some(o => o.status === "rejected")
+                          ? '❌ Order rejected'
+                          : activeOrders.some(o => o.status === "cancelled")
+                            ? '🚫 Order cancelled'
+                            : activeOrders.some(o => o.status === "preparing")
+                              ? '👨‍🍳 Cooking your food...'
+                              : activeOrders.some(o => o.status === "accepted")
+                                ? '✅ Order accepted!'
+                                : '⏳ Waiting for confirmation...'}
                     </p>
                   </div>
                 </div>
@@ -1423,7 +1448,13 @@ const CustomerMenu = () => {
           <div className={`p-8 text-center ${
             activeOrders.every(o => o.status === "completed")
               ? 'bg-gradient-to-br from-emerald-500 to-teal-500'
-              : 'bg-gradient-to-br from-amber-500 to-orange-500'
+              : activeOrders.some(o => o.status === "rejected" || o.status === "cancelled")
+                ? 'bg-gradient-to-br from-red-500 to-rose-600'
+                : activeOrders.some(o => o.status === "preparing")
+                  ? 'bg-gradient-to-br from-orange-500 to-red-500'
+                  : activeOrders.some(o => o.status === "accepted")
+                    ? 'bg-gradient-to-br from-blue-500 to-indigo-500'
+                    : 'bg-gradient-to-br from-amber-500 to-orange-500'
           }`}>
             {activeOrders.every(o => o.status === "completed") ? (
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={bounceConfig}>
@@ -1433,12 +1464,44 @@ const CustomerMenu = () => {
                 <h3 className="text-2xl font-bold text-white">Order Complete!</h3>
                 <p className="text-white/80 mt-2">Hope you enjoy your meal</p>
               </motion.div>
-            ) : (
+            ) : activeOrders.some(o => o.status === "rejected") ? (
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={bounceConfig}>
+                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-white/20 flex items-center justify-center">
+                  <X className="w-12 h-12 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Order Rejected</h3>
+                <p className="text-white/80 mt-2">Please contact staff for assistance</p>
+              </motion.div>
+            ) : activeOrders.some(o => o.status === "cancelled") ? (
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={bounceConfig}>
+                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-white/20 flex items-center justify-center">
+                  <X className="w-12 h-12 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Order Cancelled</h3>
+                <p className="text-white/80 mt-2">Your order was not accepted in time</p>
+              </motion.div>
+            ) : activeOrders.some(o => o.status === "preparing") ? (
               <>
                 <div className="flex justify-center mb-4">
                   <CookingAnimation size="lg" />
                 </div>
                 <h3 className="text-2xl font-bold text-white">Cooking Your Food</h3>
+                <p className="text-white/80 mt-2">{locationLabel} {activeOrders[0]?.table_number}</p>
+              </>
+            ) : activeOrders.some(o => o.status === "accepted") ? (
+              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={bounceConfig}>
+                <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-white/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-12 h-12 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Order Accepted!</h3>
+                <p className="text-white/80 mt-2">Kitchen is getting ready</p>
+              </motion.div>
+            ) : (
+              <>
+                <div className="flex justify-center mb-4">
+                  <CookingAnimation size="lg" />
+                </div>
+                <h3 className="text-2xl font-bold text-white">Waiting for Confirmation</h3>
                 <p className="text-white/80 mt-2">{locationLabel} {activeOrders[0]?.table_number}</p>
               </>
             )}
@@ -1448,14 +1511,32 @@ const CustomerMenu = () => {
             <div className="space-y-3">
               {activeOrders.map((order) => (
                 <div key={order.id} className={`rounded-2xl p-4 ${
-                  order.status === "completed" 
-                    ? 'bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-200 dark:border-emerald-500/30' 
-                    : 'bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700'
+                  order.status === "completed"
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 border-2 border-emerald-200 dark:border-emerald-500/30'
+                    : order.status === "rejected" || order.status === "cancelled"
+                      ? 'bg-red-50 dark:bg-red-500/10 border-2 border-red-200 dark:border-red-500/30'
+                      : order.status === "preparing"
+                        ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30'
+                        : order.status === "accepted"
+                          ? 'bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30'
+                          : 'bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700'
                 }`}>
                   <div className="flex justify-between items-center mb-3">
                     <span className="font-bold text-lg">#{order.order_number}</span>
-                    <Badge className={order.status === "completed" ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}>
-                      {order.status === "completed" ? '✓ Ready' : '⏳ Cooking'}
+                    <Badge className={
+                      order.status === "completed" ? 'bg-emerald-500 text-white' :
+                      order.status === "rejected" ? 'bg-red-500 text-white' :
+                      order.status === "cancelled" ? 'bg-rose-500 text-white' :
+                      order.status === "preparing" ? 'bg-orange-500 text-white' :
+                      order.status === "accepted" ? 'bg-blue-500 text-white' :
+                      'bg-amber-500 text-white'
+                    }>
+                      {order.status === "completed" ? '✓ Ready' :
+                       order.status === "rejected" ? '✗ Rejected' :
+                       order.status === "cancelled" ? '✗ Cancelled' :
+                       order.status === "preparing" ? '👨‍🍳 Cooking' :
+                       order.status === "accepted" ? '✅ Accepted' :
+                       '⏳ Pending'}
                     </Badge>
                   </div>
                   <div className="space-y-2">
@@ -1615,9 +1696,20 @@ const CustomerMenu = () => {
                       <span className="font-bold text-zinc-900 dark:text-white">#{order.order_number}</span>
                       <Badge className={order.status === 'completed' 
                         ? 'bg-emerald-500 text-white text-xs' 
-                        : 'bg-amber-500 text-white text-xs'
+                        : order.status === 'rejected' || order.status === 'cancelled'
+                          ? 'bg-red-500 text-white text-xs'
+                          : order.status === 'preparing'
+                            ? 'bg-orange-500 text-white text-xs'
+                            : order.status === 'accepted'
+                              ? 'bg-blue-500 text-white text-xs'
+                              : 'bg-amber-500 text-white text-xs'
                       }>
-                        {order.status === 'completed' ? '✓ Ready' : '⏳ Cooking'}
+                        {order.status === 'completed' ? '✓ Ready' :
+                         order.status === 'rejected' ? '✗ Rejected' :
+                         order.status === 'cancelled' ? '✗ Cancelled' :
+                         order.status === 'preparing' ? '👨‍🍳 Cooking' :
+                         order.status === 'accepted' ? '✅ Accepted' :
+                         '⏳ Pending'}
                       </Badge>
                     </div>
                     <span className="font-bold text-zinc-900 dark:text-white">
