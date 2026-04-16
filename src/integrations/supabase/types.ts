@@ -488,6 +488,8 @@ export type Database = {
           orders_enabled: boolean
           phone: string | null
           qr_code_url: string | null
+          qr_mode: string
+          table_config: Json
           social_links: Json | null
           subscription_plan_id: string | null
           updated_at: string
@@ -506,6 +508,8 @@ export type Database = {
           orders_enabled?: boolean
           phone?: string | null
           qr_code_url?: string | null
+          qr_mode?: string
+          table_config?: Json
           social_links?: Json | null
           subscription_plan_id?: string | null
           updated_at?: string
@@ -524,6 +528,8 @@ export type Database = {
           orders_enabled?: boolean
           phone?: string | null
           qr_code_url?: string | null
+          qr_mode?: string
+          table_config?: Json
           social_links?: Json | null
           subscription_plan_id?: string | null
           updated_at?: string

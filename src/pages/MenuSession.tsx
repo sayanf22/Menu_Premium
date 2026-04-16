@@ -30,11 +30,33 @@ const MenuSession = () => {
     try {
       const fingerprint = getClientFingerprint();
 
+      // Validate table number from QR if present
+      const sanitizedTable = tableFromQR ? tableFromQR.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10) : null;
+
+      // If per-table QR, check if this table's QR is disabled
+      if (sanitizedTable) {
+        const { data: restaurant } = await supabase
+          .from("restaurants")
+          .select("table_config, qr_mode")
+          .eq("id", restaurantId)
+          .single();
+
+        if (restaurant?.qr_mode === 'per_table') {
+          const tc = restaurant.table_config as any;
+          const disabled: number[] = Array.isArray(tc?.disabled) ? tc.disabled : [];
+          const tableNum = parseInt(sanitizedTable);
+          if (!isNaN(tableNum) && disabled.includes(tableNum)) {
+            setError(`This QR code has been temporarily disabled. Please contact staff.`);
+            return;
+          }
+        }
+      }
+
       const { data: sessionId, error: createError } = await supabase.rpc(
         "create_menu_session",
         {
           p_restaurant_id: restaurantId,
-          p_table_number: tableFromQR || null,
+          p_table_number: sanitizedTable || null,
           p_device_fingerprint: fingerprint,
         }
       );
@@ -50,9 +72,8 @@ const MenuSession = () => {
         return;
       }
 
-      // Build redirect URL — include table param so CustomerMenu pre-fills it
-      const redirectUrl = tableFromQR
-        ? `/menu/${restaurantId}?session=${sessionId}&table=${encodeURIComponent(tableFromQR)}`
+      const redirectUrl = sanitizedTable
+        ? `/menu/${restaurantId}?session=${sessionId}&table=${encodeURIComponent(sanitizedTable)}`
         : `/menu/${restaurantId}?session=${sessionId}`;
 
       navigate(redirectUrl, { replace: true });
