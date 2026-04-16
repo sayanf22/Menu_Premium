@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -143,10 +143,13 @@ const CookingAnimation = ({ size = "md" }: { size?: "sm" | "md" | "lg" }) => {
 
 const CustomerMenu = () => {
   const { restaurantId } = useParams();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { locationLabel, locationLabelLower } = useBusinessType(restaurantId || null);
   const [cart, setCart] = useState<any[]>([]);
-  const [tableNumber, setTableNumber] = useState("");
+  // Pre-fill table number from QR URL param (per-table QR mode)
+  const [tableNumber, setTableNumber] = useState(() => searchParams.get("table") || "");
+  const tableFromQR = searchParams.get("table"); // locked if came from per-table QR
   const [showOrderConfirmation, setShowOrderConfirmation] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
@@ -1419,10 +1422,17 @@ const CustomerMenu = () => {
               <Label className="text-sm text-zinc-500 dark:text-zinc-400">{locationLabel} Number</Label>
               <Input 
                 value={tableNumber} 
-                onChange={(e) => setTableNumber(e.target.value)} 
+                onChange={(e) => !tableFromQR && setTableNumber(e.target.value)} 
                 placeholder={`Enter ${locationLabelLower} number`} 
-                className="mt-1.5 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400" 
+                readOnly={!!tableFromQR}
+                className={`mt-1.5 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder:text-zinc-400 ${tableFromQR ? 'opacity-75 cursor-not-allowed' : ''}`}
               />
+              {tableFromQR && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {locationLabel} {tableFromQR} detected from QR code
+                </p>
+              )}
             </div>
             <Button 
               onClick={placeOrder} 
