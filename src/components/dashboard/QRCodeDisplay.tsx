@@ -669,33 +669,34 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                   {/* Skip numbers */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Skip Numbers</Label>
-                    <p className="text-xs text-muted-foreground">Hide numbers from the list (can be restored later)</p>
+                    <p className="text-xs text-muted-foreground">Hide numbers from the list. Can be restored anytime.</p>
                     <div className="flex gap-2">
                       <Input type="number" value={skipInput} onChange={(e) => setSkipInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSkipRequest()}
                         placeholder="e.g. 13" className="h-10 rounded-xl" />
                       <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
                         <Button variant="outline" onClick={handleSkipRequest} disabled={savingConfig} className="h-10 px-4 rounded-xl">
-                          <Plus className="h-4 w-4" />
+                          Skip
                         </Button>
                       </motion.div>
                     </div>
                     {tableConfig.skip.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {tableConfig.skip.map(num => (
-                          <motion.div key={num} initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                            <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 gap-1.5">
-                              {locationLabel} {num}
-                              <button
-                                onClick={() => handleUnskip(num)}
-                                className="ml-0.5 hover:text-primary transition-colors"
-                                title={`Restore ${locationLabel} ${num}`}
-                              >
-                                <Unlock className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          </motion.div>
-                        ))}
+                      <div className="space-y-1.5 mt-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Skipped ({tableConfig.skip.length})</p>
+                        <div className="flex flex-wrap gap-2">
+                          {tableConfig.skip.map(num => (
+                            <button
+                              key={num}
+                              onClick={() => handleUnskip(num)}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all group cursor-pointer"
+                            >
+                              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition-colors">
+                                {locationLabel} {num}
+                              </span>
+                              <Unlock className="h-3.5 w-3.5 text-zinc-400 group-hover:text-emerald-500 transition-colors" />
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
