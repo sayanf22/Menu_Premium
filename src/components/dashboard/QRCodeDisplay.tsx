@@ -450,7 +450,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold">QR Code Manager</h2>
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">QR Code Manager</h2>
           <p className="text-sm text-muted-foreground mt-1">Single QR for all or unique QR per {locationLabel.toLowerCase()}</p>
         </div>
         <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
@@ -477,7 +477,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 {mode === 'single' ? <QrIcon className={`h-5 w-5 ${isViewing ? 'text-primary' : 'text-muted-foreground'}`} /> : <Grid3X3 className={`h-5 w-5 ${isViewing ? 'text-primary' : 'text-muted-foreground'}`} />}
               </div>
               <div>
-                <p className={`font-semibold text-sm ${isViewing ? 'text-primary' : ''}`}>{mode === 'single' ? 'Single QR' : `Per ${locationLabel} QR`}</p>
+                <p className={`font-bold text-sm ${isViewing ? 'text-primary' : ''}`}>{mode === 'single' ? 'Single QR' : `Per ${locationLabel} QR`}</p>
                 <p className="text-xs text-muted-foreground">{mode === 'single' ? `One code for all ${locationLabel.toLowerCase()}s` : `Unique QR per ${locationLabel.toLowerCase()}`}</p>
               </div>
               {isActive && (
@@ -571,7 +571,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
               {/* Config Panel */}
               <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
                 <CardContent className="p-6 space-y-5">
-                  <h3 className="font-semibold flex items-center gap-2 text-base">
+                  <h3 className="font-bold flex items-center gap-2 text-base">
                     <Table2 className="h-5 w-5 text-primary" />{locationLabel} Configuration
                   </h3>
 
@@ -643,7 +643,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
               {/* QR Preview */}
               <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
                 <CardContent className="p-6 space-y-4">
-                  <h3 className="font-semibold flex items-center gap-2 text-base">
+                  <h3 className="font-bold flex items-center gap-2 text-base">
                     <QrIcon className="h-5 w-5 text-primary" />
                     QR Preview
                     {selectedTable && (
@@ -700,7 +700,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
             <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="font-semibold flex items-center gap-2">
+                  <h3 className="font-bold flex items-center gap-2">
                     <LayoutGrid className="h-5 w-5 text-primary" />
                     All {locationLabel}s
                     <Badge variant="secondary" className="rounded-full">{activeTableNumbers.length} active</Badge>
@@ -780,8 +780,8 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
             <AlertDialogDescription className="space-y-3">
               <p>
                 {confirmSwitchMode === 'per_table'
-                  ? `This will activate unique QR codes for each ${locationLabel.toLowerCase()}. Customers scanning the old single QR will still be redirected to the menu.`
-                  : `This will switch back to a single QR code for all ${locationLabel.toLowerCase()}s. Per-${locationLabel.toLowerCase()} QR codes will stop working.`}
+                  ? `This will activate unique QR codes for each ${locationLabel.toLowerCase()}. The single QR will still redirect to the menu (customers just need to enter their ${locationLabel.toLowerCase()} number manually).`
+                  : `This will switch to a single QR code. Your per-${locationLabel.toLowerCase()} QR setup will be saved and can be re-activated anytime — nothing is deleted.`}
               </p>
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">Type <span className="font-bold text-primary">CONFIRM</span> to proceed:</Label>

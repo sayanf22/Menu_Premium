@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ShoppingCart, Plus, Minus, X, Search, Moon, Sun, Clock, 
-  CheckCircle2, ArrowRight, Utensils, Sparkles, Salad, UtensilsCrossed, 
+  CheckCircle2, ArrowRight, Utensils, Salad, UtensilsCrossed, 
   Coffee, IceCream, Wine, Soup, Pizza, Sandwich, Flame, Leaf, Fish, Beef, Cookie,
   Instagram, Facebook, Twitter, Globe, ChevronDown, Loader2
 } from "lucide-react";
@@ -980,7 +980,7 @@ const CustomerMenu = () => {
                   : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
+              <Utensils className="w-4 h-4" />
               All
             </motion.button>
             {categories.filter(cat => groupedItems[cat.id]?.length > 0).map((category, idx) => {
@@ -1053,16 +1053,13 @@ const CustomerMenu = () => {
                         <IconComponent className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                       </motion.div>
                       <div>
-                        <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white capitalize">
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white capitalize tracking-tight">
                           {category.name}
                         </h2>
                         <p className="text-sm sm:text-base text-zinc-500 dark:text-zinc-400 mt-1">
                           {items.length} {items.length === 1 ? 'item' : 'delicious items'}
                         </p>
                       </div>
-                    </div>
-                    <div className="absolute right-4 top-4 opacity-20">
-                      <Sparkles className="w-12 h-12" />
                     </div>
                   </motion.div>
 
