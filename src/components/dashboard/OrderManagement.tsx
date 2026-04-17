@@ -9,7 +9,7 @@ import { useBusinessType } from "@/hooks/useBusinessType";
 import { 
   Clock, Package, Bell, RefreshCw, ChevronDown, ChevronUp, 
   Receipt, CheckCircle2, Timer, Utensils,
-  Search, Calendar, TrendingUp, X, XCircle, ChefHat, ArrowUpDown
+  Search, Calendar, TrendingUp, X, XCircle, ChefHat
 } from "lucide-react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -63,7 +63,6 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'all'>('today');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'table' | 'total'>('newest');
 
   useEffect(() => {
     fetchOrders();
@@ -288,24 +287,12 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
     });
 
     return Array.from(groups.values()).sort((a, b) => {
-      // Active orders always on top
       if (a.allCompleted !== b.allCompleted) {
         return a.allCompleted ? 1 : -1;
       }
-      // Then sort by selected criteria
-      switch (sortBy) {
-        case 'oldest':
-          return new Date(a.latestOrderTime).getTime() - new Date(b.latestOrderTime).getTime();
-        case 'table':
-          return a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true });
-        case 'total':
-          return b.totalPrice - a.totalPrice;
-        case 'newest':
-        default:
-          return new Date(b.latestOrderTime).getTime() - new Date(a.latestOrderTime).getTime();
-      }
+      return new Date(b.latestOrderTime).getTime() - new Date(a.latestOrderTime).getTime();
     });
-  }, [filteredOrders, newOrderIds, sortBy]);
+  }, [filteredOrders, newOrderIds]);
 
   const toggleSessionExpand = (sessionId: string) => {
     setExpandedSessions(prev => {
@@ -567,34 +554,6 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             >
               All Time
             </Button>
-          </div>
-        </div>
-
-        {/* Sort & Results Summary */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground font-medium">
-            {sessionGroups.length} {sessionGroups.length === 1 ? 'group' : 'groups'} • {filteredOrders.length} orders
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Sort:</span>
-            <div className="flex gap-1">
-              {([
-                { id: 'newest', label: 'Newest' },
-                { id: 'oldest', label: 'Oldest' },
-                { id: 'table', label: 'Table' },
-                { id: 'total', label: 'Amount' },
-              ] as const).map(s => (
-                <Button
-                  key={s.id}
-                  variant={sortBy === s.id ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setSortBy(s.id)}
-                  className={`text-xs h-7 px-2.5 rounded-lg ${sortBy === s.id ? '' : 'text-muted-foreground'}`}
-                >
-                  {s.label}
-                </Button>
-              ))}
-            </div>
           </div>
         </div>
       </div>
