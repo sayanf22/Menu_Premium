@@ -70,6 +70,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
   const [creditsUsed, setCreditsUsed] = useState(0);
   const [creditsTotal] = useState(3);
   const [creditsLoaded, setCreditsLoaded] = useState(false);
+  const [importedItems, setImportedItems] = useState<{ name: string; emoji: string; color: string }[]>([]);
 
   // Load current credit usage on mount
   const loadCredits = useCallback(async () => {
@@ -207,10 +208,16 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
     setStep("importing");
     setImportProgress(0);
     setImportedCount(0);
+    setImportedItems([]);
 
     let imported = 0;
-    const allItems = parsedCategories.flatMap(cat =>
-      cat.items.map(item => ({ ...item, categoryName: cat.name }))
+    const allItems = parsedCategories.flatMap((cat, catIdx) =>
+      cat.items.map(item => ({
+        ...item,
+        categoryName: cat.name,
+        emoji: getCategoryEmoji(cat.name),
+        color: PLACEHOLDER_COLORS[catIdx % PLACEHOLDER_COLORS.length],
+      }))
     );
     const total = allItems.length;
 
@@ -238,7 +245,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
         }
       }
 
-      // Insert items with size variants support
+      // Insert items one by one with animation
       for (const item of allItems) {
         const categoryId = categoryMap[item.categoryName] || null;
         await supabase.from("menu_items").insert({
@@ -254,7 +261,8 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
         imported++;
         setImportedCount(imported);
         setImportProgress(Math.round((imported / total) * 100));
-        await new Promise(r => setTimeout(r, 60));
+        setImportedItems(prev => [...prev, { name: item.name, emoji: item.emoji, color: item.color }]);
+        await new Promise(r => setTimeout(r, 120)); // Slightly slower for visible animation
       }
 
       setStep("done");
@@ -263,7 +271,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
         description: `${imported} items added across ${parsedCategories.length} categories`,
         duration: 6000,
       });
-      setTimeout(() => onImportComplete(), 1500);
+      setTimeout(() => onImportComplete(), 2000);
 
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -280,6 +288,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
     setExpandedCategories(new Set());
     setImportProgress(0);
     setImportedCount(0);
+    setImportedItems([]);
     setTotalItems(0);
     setErrorMsg(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -538,19 +547,38 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
           </motion.div>
         )}
 
-        {/* IMPORTING */}
+        {/* IMPORTING — animated item list */}
         {step === "importing" && (
-          <motion.div key="importing" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="space-y-5 py-6">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
-                <Loader2 className="h-8 w-8 text-violet-500 animate-spin" />
+          <motion.div key="importing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+            {/* Progress header */}
+            <div className="flex items-center gap-3 p-3 bg-violet-50 dark:bg-violet-950/20 rounded-2xl border border-violet-200 dark:border-violet-800">
+              <Loader2 className="h-5 w-5 text-violet-500 animate-spin flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-sm text-violet-800 dark:text-violet-300">
+                  Adding items... {importedCount}/{totalItems}
+                </p>
+                <Progress value={importProgress} className="h-1.5 rounded-full mt-1.5" />
               </div>
-              <p className="font-semibold">Adding items to your menu...</p>
-              <p className="text-sm text-muted-foreground mt-1">{importedCount} of {totalItems} items added</p>
+              <span className="text-xs font-mono text-violet-600 dark:text-violet-400">{importProgress}%</span>
             </div>
-            <div className="space-y-2">
-              <Progress value={importProgress} className="h-3 rounded-full" />
-              <p className="text-xs text-center text-muted-foreground">{importProgress}% complete</p>
+
+            {/* Animated item list — shows items appearing one by one */}
+            <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+              {importedItems.map((item, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -20, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 shadow-sm"
+                >
+                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${item.color} flex items-center justify-center text-sm flex-shrink-0 shadow-sm`}>
+                    {item.emoji}
+                  </div>
+                  <span className="text-sm font-medium truncate flex-1">{item.name}</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         )}
