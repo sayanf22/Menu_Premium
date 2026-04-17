@@ -76,7 +76,8 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   const [copied, setCopied] = useState<string | null>(null);
   const [showCustomize, setShowCustomize] = useState(false);
   const [activeTab, setActiveTab] = useState<'single' | 'per_table'>('single');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const singleCanvasRef = useRef<HTMLCanvasElement>(null);
+  const perTableCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // DB state
   const [qrMode, setQrMode] = useState<QRMode>('single');
@@ -217,10 +218,18 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     }
   }, [scanUrl, config]);
 
+  // Draw QR on single canvas
   useEffect(() => {
-    if (canvasRef.current) {
-      const url = (activeTab === 'per_table' && selectedTable) ? getTableScanUrl(selectedTable) : scanUrl;
-      generateQR(canvasRef.current, 400, config, url);
+    if (activeTab === 'single' && singleCanvasRef.current) {
+      generateQR(singleCanvasRef.current, 400, config, scanUrl);
+    }
+  }, [restaurantId, generateQR, config, activeTab]);
+
+  // Draw QR on per-table canvas
+  useEffect(() => {
+    if (activeTab === 'per_table' && selectedTable && perTableCanvasRef.current) {
+      const url = getTableScanUrl(selectedTable);
+      generateQR(perTableCanvasRef.current, 400, config, url);
     }
   }, [restaurantId, generateQR, config, activeTab, selectedTable]);
 
@@ -462,7 +471,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   );
 
   // QR Canvas preview card
-  const QRPreviewCard = ({ url, label }: { url: string; label?: string }) => (
+  const QRPreviewCard = ({ label, canvasRefProp }: { label?: string; canvasRefProp: React.RefObject<HTMLCanvasElement> }) => (
     <div className="relative bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-xl border border-zinc-100 dark:border-zinc-800">
       {config.frameStyle !== 'none' && (
         <>
@@ -472,7 +481,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
           <div className={`absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-br-xl' : 'rounded-br-lg'}`} />
         </>
       )}
-      <canvas ref={canvasRef} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
+      <canvas ref={canvasRefProp} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
       {label && (
         <div className="mt-3 text-center">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-xs font-semibold text-primary">
@@ -538,7 +547,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 <CardContent className="p-0">
                   <div className="bg-gradient-to-br from-primary/5 via-background to-primary/10 p-6 md:p-8">
                     <div className="max-w-xs mx-auto">
-                      <QRPreviewCard url={scanUrl} label="Scan to view menu" />
+                      <QRPreviewCard canvasRefProp={singleCanvasRef} label="Scan to view menu" />
                     </div>
                   </div>
                   <div className="p-4 bg-muted/30 border-t grid grid-cols-4 gap-2">
@@ -694,7 +703,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                   <AnimatePresence mode="wait">
                     {selectedTable ? (
                       <motion.div key={selectedTable} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                        <QRPreviewCard url={getTableScanUrl(selectedTable)} label={`${locationLabel} ${selectedTable}`} />
+                        <QRPreviewCard canvasRefProp={perTableCanvasRef} label={`${locationLabel} ${selectedTable}`} />
                         {tableConfig.disabled.includes(selectedTable) && (
                           <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-2">
                             <PauseCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
