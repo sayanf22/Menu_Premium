@@ -95,6 +95,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   const [confirmDisable, setConfirmDisable] = useState<number | null>(null);
   const [confirmEnable, setConfirmEnable] = useState<number | null>(null);
   const [confirmSkipNum, setConfirmSkipNum] = useState<number | null>(null);
+  const [confirmUnskipNum, setConfirmUnskipNum] = useState<number | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
   // QR style config
@@ -342,11 +343,17 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     setAddInput("");
   };
 
-  // Un-skip a number (restore it)
+  // Un-skip a number — show confirmation first
   const handleUnskip = (num: number) => {
-    const newConfig = { ...tableConfig, skip: tableConfig.skip.filter(s => s !== num) };
-    saveConfig(qrMode, newConfig);
-    toast({ title: `${locationLabel} ${num} restored` });
+    setConfirmUnskipNum(num);
+  };
+
+  const confirmUnskipNumber = async () => {
+    if (!confirmUnskipNum) return;
+    const newConfig = { ...tableConfig, skip: tableConfig.skip.filter(s => s !== confirmUnskipNum) };
+    await saveConfig(qrMode, newConfig);
+    toast({ title: `${locationLabel} ${confirmUnskipNum} restored` });
+    setConfirmUnskipNum(null);
   };
 
   // Skip a number — requires confirmation
@@ -945,6 +952,27 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
             <AlertDialogCancel className="rounded-xl" onClick={() => { setConfirmSkipNum(null); setConfirmText(""); }}>Cancel</AlertDialogCancel>
             <AlertDialogAction className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white" onClick={confirmSkipNumber} disabled={savingConfig || confirmText.toUpperCase() !== "CONFIRM"}>
               {savingConfig ? "Skipping..." : `Skip ${locationLabel} ${confirmSkipNum}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unskip / Restore Confirmation */}
+      <AlertDialog open={!!confirmUnskipNum} onOpenChange={(o) => { if (!o) setConfirmUnskipNum(null); }}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Unlock className="h-5 w-5 text-emerald-500" />
+              Restore {locationLabel} {confirmUnskipNum}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {locationLabel} {confirmUnskipNum} will be added back to your active list and its QR code will start working again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setConfirmUnskipNum(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white" onClick={confirmUnskipNumber} disabled={savingConfig}>
+              {savingConfig ? "Restoring..." : `Restore ${locationLabel} ${confirmUnskipNum}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
