@@ -548,10 +548,9 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
         })}
       </div>
 
-      <AnimatePresence mode="wait">
-        {/* -- SINGLE QR TAB -- */}
-        {activeTab === 'single' && (
-          <motion.div key="single" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }}>
+      {/* -- SINGLE QR TAB -- */}
+      {activeTab === 'single' && (
+        <div>
             <div className="grid lg:grid-cols-5 gap-6">
               {/* Preview */}
               <Card className="lg:col-span-3 border-0 shadow-xl rounded-2xl overflow-hidden">
@@ -627,12 +626,12 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 </AnimatePresence>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* -- PER-TABLE QR TAB -- */}
         {activeTab === 'per_table' && (
-          <motion.div key="per_table" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.2 }} className="space-y-6">
+          <div className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
               {/* Config Panel */}
               <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
@@ -726,32 +725,30 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                     )}
                   </h3>
 
-                  <AnimatePresence mode="wait">
-                    {selectedTable ? (
-                      <motion.div key={selectedTable} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                        <div className="relative bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-xl border border-zinc-100 dark:border-zinc-800">
-                          <FrameCorners />
-                          <canvas ref={perTableCanvasRef} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
-                          <div className="mt-3 text-center">
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-xs font-semibold text-primary">
-                              <Smartphone className="w-3.5 h-3.5" />{locationLabel} {selectedTable}
-                            </span>
-                          </div>
+                  {selectedTable ? (
+                    <div>
+                      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-xl border border-zinc-100 dark:border-zinc-800">
+                        <FrameCorners />
+                        <canvas ref={perTableCanvasRef} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
+                        <div className="mt-3 text-center">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-xs font-semibold text-primary">
+                            <Smartphone className="w-3.5 h-3.5" />{locationLabel} {selectedTable}
+                          </span>
                         </div>
-                        {tableConfig.disabled.includes(selectedTable) && (
-                          <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-2">
-                            <PauseCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                            <p className="text-xs text-amber-700 dark:text-amber-400">QR is stopped � customers cannot scan this</p>
-                          </div>
-                        )}
-                      </motion.div>
-                    ) : (
-                      <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[200px] text-muted-foreground">
-                        <Grid3X3 className="h-14 w-14 mb-3 opacity-20" />
-                        <p className="text-sm">Select a {locationLabel.toLowerCase()} to preview its QR</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      </div>
+                      {tableConfig.disabled.includes(selectedTable) && (
+                        <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-2">
+                          <PauseCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                          <p className="text-xs text-amber-700 dark:text-amber-400">QR is stopped — customers cannot scan this</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center min-h-[200px] text-muted-foreground">
+                      <Grid3X3 className="h-14 w-14 mb-3 opacity-20" />
+                      <p className="text-sm">Select a {locationLabel.toLowerCase()} to preview its QR</p>
+                    </div>
+                  )}
 
                   {selectedTable && (
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-2 gap-2">
@@ -844,9 +841,8 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 )}
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* -- CONFIRMATION DIALOGS -- */}
 
