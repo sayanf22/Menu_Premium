@@ -70,7 +70,6 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
   const [importedCount, setImportedCount] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [usageInfo, setUsageInfo] = useState<string | null>(null);
 
   const handleFile = useCallback((file: File) => {
     // Validate file type
@@ -140,8 +139,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
 
       if (!response.ok) {
         if (response.status === 429) {
-          setUsageInfo(data.error);
-          throw new Error(data.error);
+          throw new Error(data.error || "AI import already used this billing period");
         }
         throw new Error(data.error || "Failed to analyze menu");
       }
@@ -264,7 +262,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
           <h3 className="font-semibold text-base flex items-center gap-2">
             AI Menu Import
             <Badge className="bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/30 text-xs rounded-full" variant="outline">
-              1× per month
+              1× per billing period
             </Badge>
           </h3>
           <p className="text-xs text-muted-foreground">Upload a photo of your menu — AI extracts all items automatically</p>
@@ -279,9 +277,6 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
               <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-700 dark:text-red-400">{errorMsg}</p>
-                {usageInfo && (
-                  <p className="text-xs text-red-500 mt-1">{usageInfo}</p>
-                )}
               </div>
               <button onClick={() => setErrorMsg(null)} className="text-red-400 hover:text-red-600">
                 <X className="h-4 w-4" />
