@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import QRCode from "qrcode";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBusinessType } from "@/hooks/useBusinessType";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface QRCodeDisplayProps {
   restaurantId: string;
@@ -75,12 +76,13 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   const { locationLabel } = useBusinessType(restaurantId);
   const [copied, setCopied] = useState<string | null>(null);
   const [showCustomize, setShowCustomize] = useState(false);
-  const [activeTab, setActiveTab] = useState<'single' | 'per_table'>('single');
+  const [activeTab, setActiveTab] = useState<'single' | 'per_table' | null>(null); // null = loading
   const singleCanvasRef = useRef<HTMLCanvasElement>(null);
   const perTableCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // DB state
   const [qrMode, setQrMode] = useState<QRMode>('single');
+  const [configLoaded, setConfigLoaded] = useState(false);
   const [tableConfig, setTableConfig] = useState<TableConfig>({ total: 10, skip: [], disabled: [], custom_labels: {} });
   const [savingConfig, setSavingConfig] = useState(false);
 
@@ -132,7 +134,10 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
           disabled: Array.isArray(tc.disabled) ? tc.disabled : [],
           custom_labels: tc.custom_labels || {},
         });
+      } else {
+        setActiveTab('single');
       }
+      setConfigLoaded(true);
     };
     load();
   }, [restaurantId]);
@@ -512,6 +517,30 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Skeleton while loading config from DB */}
+      {!configLoaded ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48 rounded-xl" />
+              <Skeleton className="h-4 w-64 rounded-lg" />
+            </div>
+            <Skeleton className="h-10 w-28 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Skeleton className="h-28 rounded-2xl" />
+            <Skeleton className="h-28 rounded-2xl" />
+          </div>
+          <div className="grid lg:grid-cols-5 gap-6">
+            <Skeleton className="lg:col-span-3 h-96 rounded-2xl" />
+            <div className="lg:col-span-2 space-y-4">
+              <Skeleton className="h-40 rounded-2xl" />
+              <Skeleton className="h-32 rounded-2xl" />
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -978,6 +1007,8 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </>
+      )}
     </div>
   );
 };
