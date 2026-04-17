@@ -14,7 +14,7 @@ import {
   Download, QrCode as QrIcon, ExternalLink, Copy, Check, Smartphone, Printer,
   Palette, Circle, Square, Diamond, Hexagon, Star, Settings2, RotateCcw,
   Grid3X3, LayoutGrid, Plus, X, ChevronDown, ChevronUp, Layers, Table2,
-  PauseCircle, PlayCircle, AlertTriangle
+  PauseCircle, PlayCircle, AlertTriangle, Unlock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -155,11 +155,10 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     return { isGradient: false, colors: [color] };
   };
 
-  const generateQR = useCallback(async (canvas: HTMLCanvasElement, size: number, cfg: QRConfig = config, url?: string) => {
+  const generateQR = async (canvas: HTMLCanvasElement, size: number, cfg: QRConfig, url: string) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const targetUrl = url || scanUrl;
-    const qrData = await QRCode.create(targetUrl, { errorCorrectionLevel: "H" });
+    const qrData = await QRCode.create(url, { errorCorrectionLevel: "H" });
     const modules = qrData.modules;
     const moduleCount = modules.size;
     const margin = Math.floor(size * 0.08);
@@ -216,22 +215,37 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
         }
       }
     }
-  }, [scanUrl, config]);
+  };
 
-  // Draw QR on single canvas
-  useEffect(() => {
-    if (activeTab === 'single' && singleCanvasRef.current) {
+  // Redraw QR whenever config/tab/selection changes — use requestAnimationFrame for stability
+  const drawSingleQR = useCallback(() => {
+    if (singleCanvasRef.current) {
       generateQR(singleCanvasRef.current, 400, config, scanUrl);
     }
-  }, [restaurantId, generateQR, config, activeTab]);
+  }, [config, scanUrl, restaurantId]);
 
-  // Draw QR on per-table canvas
-  useEffect(() => {
-    if (activeTab === 'per_table' && selectedTable && perTableCanvasRef.current) {
-      const url = getTableScanUrl(selectedTable);
-      generateQR(perTableCanvasRef.current, 400, config, url);
+  const drawPerTableQR = useCallback(() => {
+    if (selectedTable && perTableCanvasRef.current) {
+      generateQR(perTableCanvasRef.current, 400, config, getTableScanUrl(selectedTable));
     }
-  }, [restaurantId, generateQR, config, activeTab, selectedTable]);
+  }, [config, selectedTable, restaurantId]);
+
+  // Draw single QR when tab is active
+  useEffect(() => {
+    if (activeTab === 'single') {
+      // Small delay to ensure canvas is mounted after AnimatePresence transition
+      const timer = setTimeout(drawSingleQR, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, drawSingleQR]);
+
+  // Draw per-table QR when tab is active and table selected
+  useEffect(() => {
+    if (activeTab === 'per_table' && selectedTable) {
+      const timer = setTimeout(drawPerTableQR, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, selectedTable, drawPerTableQR]);
 
   // Save config via secure DB function
   const saveConfig = async (newMode: QRMode, newConfig: TableConfig) => {
@@ -300,22 +314,25 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     setConfirmText("");
   };
 
-  // Add new table/room (only add, never delete, cannot un-skip)
+  // Add new table/room (only add, never delete)
   const handleAddTable = () => {
     const num = parseInt(addInput.trim());
     if (isNaN(num) || num < 1 || num > 500) {
       toast({ title: "Invalid number", description: "Enter a number between 1 and 500", variant: "destructive" });
       return;
     }
-    // If it was skipped, it's permanent — cannot be added back
-    if (tableConfig.skip.includes(num)) {
-      toast({ title: "Cannot add", description: `${locationLabel} ${num} was permanently skipped and cannot be restored`, variant: "destructive" });
+    // If within current total and not skipped, it already exists
+    if (num <= tableConfig.total && !tableConfig.skip.includes(num)) {
+      toast({ title: `${locationLabel} ${num} already exists` });
       setAddInput("");
       return;
     }
-    // If within current total, it already exists
-    if (num <= tableConfig.total) {
-      toast({ title: `${locationLabel} ${num} already exists` });
+    // If it was skipped, un-skip it
+    if (tableConfig.skip.includes(num)) {
+      const newConfig = { ...tableConfig, skip: tableConfig.skip.filter(s => s !== num) };
+      if (num > tableConfig.total) newConfig.total = num;
+      saveConfig(qrMode, newConfig);
+      toast({ title: `${locationLabel} ${num} restored`, description: "Removed from skip list" });
       setAddInput("");
       return;
     }
@@ -325,7 +342,14 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     setAddInput("");
   };
 
-  // Skip a number — requires confirmation, PERMANENT (enforced server-side)
+  // Un-skip a number (restore it)
+  const handleUnskip = (num: number) => {
+    const newConfig = { ...tableConfig, skip: tableConfig.skip.filter(s => s !== num) };
+    saveConfig(qrMode, newConfig);
+    toast({ title: `${locationLabel} ${num} restored` });
+  };
+
+  // Skip a number — requires confirmation
   const handleSkipRequest = () => {
     const num = parseInt(skipInput.trim());
     if (isNaN(num) || num < 1 || num > tableConfig.total) {
@@ -336,7 +360,6 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
       toast({ title: "Already skipped" });
       return;
     }
-    // Show confirmation dialog
     setConfirmSkipNum(num);
     setConfirmText("");
     setSkipInput("");
@@ -470,26 +493,14 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     </div>
   );
 
-  // QR Canvas preview card
-  const QRPreviewCard = ({ label, canvasRefProp }: { label?: string; canvasRefProp: React.RefObject<HTMLCanvasElement> }) => (
-    <div className="relative bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-xl border border-zinc-100 dark:border-zinc-800">
-      {config.frameStyle !== 'none' && (
-        <>
-          <div className={`absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tl-xl' : 'rounded-tl-lg'}`} />
-          <div className={`absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tr-xl' : 'rounded-tr-lg'}`} />
-          <div className={`absolute bottom-3 left-3 w-7 h-7 border-b-2 border-l-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-bl-xl' : 'rounded-bl-lg'}`} />
-          <div className={`absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-br-xl' : 'rounded-br-lg'}`} />
-        </>
-      )}
-      <canvas ref={canvasRefProp} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
-      {label && (
-        <div className="mt-3 text-center">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-xs font-semibold text-primary">
-            <Smartphone className="w-3.5 h-3.5" />{label}
-          </span>
-        </div>
-      )}
-    </div>
+  // Frame corners helper
+  const FrameCorners = () => config.frameStyle === 'none' ? null : (
+    <>
+      <div className={`absolute top-3 left-3 w-7 h-7 border-t-2 border-l-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tl-xl' : 'rounded-tl-lg'}`} />
+      <div className={`absolute top-3 right-3 w-7 h-7 border-t-2 border-r-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-tr-xl' : 'rounded-tr-lg'}`} />
+      <div className={`absolute bottom-3 left-3 w-7 h-7 border-b-2 border-l-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-bl-xl' : 'rounded-bl-lg'}`} />
+      <div className={`absolute bottom-3 right-3 w-7 h-7 border-b-2 border-r-2 border-primary ${config.frameStyle === 'fancy' ? 'rounded-br-xl' : 'rounded-br-lg'}`} />
+    </>
   );
 
   return (
@@ -547,7 +558,15 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                 <CardContent className="p-0">
                   <div className="bg-gradient-to-br from-primary/5 via-background to-primary/10 p-6 md:p-8">
                     <div className="max-w-xs mx-auto">
-                      <QRPreviewCard canvasRefProp={singleCanvasRef} label="Scan to view menu" />
+                      <div className="relative bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-xl border border-zinc-100 dark:border-zinc-800">
+                        <FrameCorners />
+                        <canvas ref={singleCanvasRef} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
+                        <div className="mt-3 text-center">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-xs font-semibold text-primary">
+                            <Smartphone className="w-3.5 h-3.5" />Scan to view menu
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="p-4 bg-muted/30 border-t grid grid-cols-4 gap-2">
@@ -644,7 +663,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                   {/* Skip numbers */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Skip Numbers</Label>
-                    <p className="text-xs text-red-500 dark:text-red-400 font-medium">⚠️ Permanent — skipped numbers cannot be restored</p>
+                    <p className="text-xs text-muted-foreground">Hide numbers from the list (can be restored later)</p>
                     <div className="flex gap-2">
                       <Input type="number" value={skipInput} onChange={(e) => setSkipInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSkipRequest()}
@@ -659,8 +678,15 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {tableConfig.skip.map(num => (
                           <motion.div key={num} initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                            <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800">
-                              {locationLabel} {num} — permanently skipped
+                            <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 gap-1.5">
+                              {locationLabel} {num}
+                              <button
+                                onClick={() => handleUnskip(num)}
+                                className="ml-0.5 hover:text-primary transition-colors"
+                                title={`Restore ${locationLabel} ${num}`}
+                              >
+                                <Unlock className="h-3 w-3" />
+                              </button>
                             </Badge>
                           </motion.div>
                         ))}
@@ -703,7 +729,15 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                   <AnimatePresence mode="wait">
                     {selectedTable ? (
                       <motion.div key={selectedTable} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                        <QRPreviewCard canvasRefProp={perTableCanvasRef} label={`${locationLabel} ${selectedTable}`} />
+                        <div className="relative bg-white dark:bg-zinc-900 rounded-2xl p-6 shadow-xl border border-zinc-100 dark:border-zinc-800">
+                          <FrameCorners />
+                          <canvas ref={perTableCanvasRef} className="w-full aspect-square rounded-xl" style={{ imageRendering: "crisp-edges" }} />
+                          <div className="mt-3 text-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-xs font-semibold text-primary">
+                              <Smartphone className="w-3.5 h-3.5" />{locationLabel} {selectedTable}
+                            </span>
+                          </div>
+                        </div>
                         {tableConfig.disabled.includes(selectedTable) && (
                           <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-2">
                             <PauseCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
@@ -893,33 +927,28 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Skip Number Confirmation (PERMANENT) */}
+      {/* Skip Number Confirmation */}
       <AlertDialog open={!!confirmSkipNum} onOpenChange={(o) => { if (!o) { setConfirmSkipNum(null); setConfirmText(""); } }}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Permanently Skip {locationLabel} {confirmSkipNum}?
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Skip {locationLabel} {confirmSkipNum}?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
-              <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800">
-                <p className="text-sm font-semibold text-red-700 dark:text-red-400">
-                  ⚠️ This action is PERMANENT and cannot be undone.
-                </p>
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                  {locationLabel} {confirmSkipNum} will be permanently removed from your list. It cannot be added back or restored. The QR code for this number will stop working forever.
-                </p>
-              </div>
+              <p>
+                {locationLabel} {confirmSkipNum} will be hidden from the list and its QR code will stop working. You can restore it later using the unlock button.
+              </p>
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Type <span className="font-bold text-red-600">CONFIRM</span> to permanently skip:</Label>
-                <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="CONFIRM" className="font-mono rounded-xl border-red-300 focus:border-red-500 focus:ring-red-500" autoComplete="off" />
+                <Label className="text-sm font-medium">Type <span className="font-bold text-primary">CONFIRM</span> to skip:</Label>
+                <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="CONFIRM" className="font-mono rounded-xl" autoComplete="off" />
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-xl" onClick={() => { setConfirmSkipNum(null); setConfirmText(""); }}>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="rounded-xl bg-red-500 hover:bg-red-600 text-white" onClick={confirmSkipNumber} disabled={savingConfig || confirmText.toUpperCase() !== "CONFIRM"}>
-              {savingConfig ? "Skipping..." : `Permanently Skip ${locationLabel} ${confirmSkipNum}`}
+            <AlertDialogAction className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white" onClick={confirmSkipNumber} disabled={savingConfig || confirmText.toUpperCase() !== "CONFIRM"}>
+              {savingConfig ? "Skipping..." : `Skip ${locationLabel} ${confirmSkipNum}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
