@@ -365,38 +365,61 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
             {/* Image thumbnails */}
             {images.length > 0 && (
               <div className="space-y-3">
-                <div className="grid grid-cols-4 gap-2">
+                {/* Preview grid — larger thumbnails with numbers */}
+                <div className="grid grid-cols-3 gap-3">
                   {images.map((img, idx) => (
-                    <motion.div key={idx} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="relative group aspect-square">
-                      <img src={img.previewUrl} alt="" className="w-full h-full object-cover rounded-xl border border-zinc-200 dark:border-zinc-700" />
+                    <div key={idx} className="relative group aspect-[4/3] rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 shadow-sm">
+                      <img src={img.previewUrl} alt={`Menu page ${idx + 1}`} className="w-full h-full object-cover" />
+                      {/* Image number badge */}
+                      <div className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-white">{idx + 1}</span>
+                      </div>
+                      {/* Remove button */}
                       <button
                         onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                       >
                         <X className="h-3 w-3" />
                       </button>
-                    </motion.div>
+                      {/* File size */}
+                      <div className="absolute bottom-1.5 right-1.5">
+                        <span className="text-[9px] font-medium bg-black/50 text-white px-1.5 py-0.5 rounded-full">
+                          {(img.file.size / 1024 / 1024).toFixed(1)}MB
+                        </span>
+                      </div>
+                    </div>
                   ))}
+                  {/* Add more button */}
                   {images.length < 20 && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="aspect-square rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-violet-400 flex items-center justify-center text-muted-foreground hover:text-violet-500 transition-colors"
+                      className="aspect-[4/3] rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-950/10 flex flex-col items-center justify-center text-muted-foreground hover:text-violet-500 transition-all gap-1"
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-6 w-6" />
+                      <span className="text-[10px] font-medium">Add more</span>
                     </button>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground text-center">{images.length} image{images.length !== 1 ? "s" : ""} selected</p>
-                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                  <Button
-                    onClick={handleAnalyze}
-                    disabled={creditsRemaining <= 0}
-                    className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold gap-2 shadow-lg shadow-violet-500/25 disabled:opacity-50"
-                  >
-                    <ScanSearch className="h-5 w-5" />
-                    {creditsRemaining <= 0 ? "No credits remaining" : `Analyze ${images.length} Image${images.length !== 1 ? "s" : ""} with AI`}
-                  </Button>
-                </motion.div>
+
+                {/* Summary */}
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs text-muted-foreground">
+                    {images.length} image{images.length !== 1 ? "s" : ""} ready to analyze
+                  </p>
+                  <button onClick={() => { images.forEach(img => URL.revokeObjectURL(img.previewUrl)); setImages([]); }} className="text-xs text-red-500 hover:text-red-600 font-medium">
+                    Clear all
+                  </button>
+                </div>
+
+                {/* Analyze button */}
+                <Button
+                  onClick={handleAnalyze}
+                  disabled={creditsRemaining <= 0}
+                  className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold gap-2 shadow-lg shadow-violet-500/25 disabled:opacity-50"
+                >
+                  <ScanSearch className="h-5 w-5" />
+                  {creditsRemaining <= 0 ? "No credits remaining" : `Analyze ${images.length} Image${images.length !== 1 ? "s" : ""} with AI`}
+                </Button>
                 {creditsRemaining <= 0 && (
                   <p className="text-xs text-center text-muted-foreground">Credits reset on your next billing cycle</p>
                 )}
