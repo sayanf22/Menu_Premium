@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Order {
   id: string;
@@ -56,6 +57,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   // Filter states
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
@@ -123,6 +125,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
       });
     } finally {
       setIsRefreshing(false);
+      setInitialLoading(false);
     }
   };
 
@@ -385,10 +388,39 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
   return (
     <div className="space-y-6">
+      {/* Skeleton Loading */}
+      {initialLoading ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-52 rounded-xl" />
+              <Skeleton className="h-4 w-72 rounded-lg" />
+            </div>
+            <Skeleton className="h-10 w-24 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-24 rounded-2xl" />
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-10 w-28 rounded-full" />
+            ))}
+          </div>
+          <Skeleton className="h-11 w-full rounded-xl" />
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <Skeleton key={i} className="h-28 rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold">Order Management</h2>
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">Order Management</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Real-time order tracking grouped by customer session
           </p>
@@ -396,7 +428,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
         <Button 
           onClick={fetchOrders} 
           variant="outline"
-          className="gap-2"
+          className="gap-2 rounded-xl shadow-sm hover:shadow-md transition-shadow"
           disabled={isRefreshing}
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -406,47 +438,47 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveTab('active')}>
+        <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => setActiveTab('active')}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-orange-500/20">
+            <div className="p-2.5 rounded-xl bg-orange-500/20 shadow-sm">
               <Timer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{activeOrdersCount}</p>
-              <p className="text-xs text-muted-foreground">Active Orders</p>
+              <p className="text-2xl font-extrabold">{activeOrdersCount}</p>
+              <p className="text-xs text-muted-foreground font-medium">Active Orders</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
+        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/20">
+            <div className="p-2.5 rounded-xl bg-emerald-500/20 shadow-sm">
               <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{completedOrdersCount}</p>
-              <p className="text-xs text-muted-foreground">Completed</p>
+              <p className="text-2xl font-extrabold">{completedOrdersCount}</p>
+              <p className="text-xs text-muted-foreground font-medium">Completed</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20 cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setActiveTab('cancelled'); setDateFilter('all'); }}>
+        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-500/5 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => { setActiveTab('cancelled'); setDateFilter('all'); }}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-red-500/20">
+            <div className="p-2.5 rounded-xl bg-red-500/20 shadow-sm">
               <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{cancelledOrdersCount}</p>
-              <p className="text-xs text-muted-foreground">Cancelled/Rejected</p>
+              <p className="text-2xl font-extrabold">{cancelledOrdersCount}</p>
+              <p className="text-xs text-muted-foreground font-medium">Cancelled</p>
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-0 shadow-md rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/20">
+            <div className="p-2.5 rounded-xl bg-blue-500/20 shadow-sm">
               <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold">₹{todayRevenue.toFixed(0)}</p>
-              <p className="text-xs text-muted-foreground">Today's Revenue</p>
+              <p className="text-2xl font-extrabold">₹{todayRevenue.toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground font-medium">Today's Revenue</p>
             </div>
           </div>
         </Card>
@@ -463,15 +495,14 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               size="sm"
               onClick={() => {
                 setActiveTab(tab.id);
-                // Auto-switch to "All Time" for completed/cancelled orders to show all history
                 if (tab.id === 'completed' || tab.id === 'cancelled') {
                   setDateFilter('all');
                 }
               }}
-              className="gap-2"
+              className={`gap-2 rounded-full shadow-sm ${activeTab === tab.id ? 'shadow-md' : 'hover:shadow-md'} transition-all`}
             >
               {tab.label}
-              <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'} className="ml-1">
+              <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'} className="ml-1 rounded-full">
                 {tab.count}
               </Badge>
             </Button>
@@ -486,7 +517,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               placeholder={`Search by order #, ${locationLabelLower}, or item...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10"
+              className="pl-10 pr-10 h-11 rounded-xl shadow-sm border-zinc-200 dark:border-zinc-700"
             />
             {searchQuery && (
               <button
@@ -502,7 +533,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               variant={dateFilter === 'today' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateFilter('today')}
-              className="gap-2"
+              className="gap-2 rounded-full shadow-sm"
             >
               <Calendar className="h-4 w-4" />
               Today
@@ -511,6 +542,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               variant={dateFilter === 'week' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateFilter('week')}
+              className="rounded-full shadow-sm"
             >
               This Week
             </Button>
@@ -518,6 +550,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               variant={dateFilter === 'all' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setDateFilter('all')}
+              className="rounded-full shadow-sm"
             >
               All Time
             </Button>
@@ -540,12 +573,12 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.2 }}
               >
-                <Card className={`overflow-hidden transition-all duration-300 ${
+                <Card className={`overflow-hidden transition-all duration-300 border-0 shadow-md rounded-2xl ${
                   group.allCompleted 
                     ? 'opacity-70 bg-muted/30' 
                     : group.hasNewOrder 
-                      ? 'ring-2 ring-orange-500/50 shadow-lg shadow-orange-500/10' 
-                      : 'hover:shadow-md'
+                      ? 'ring-2 ring-orange-500/50 shadow-xl shadow-orange-500/10' 
+                      : 'hover:shadow-lg'
                 }`}>
                   {/* Session Header */}
                   <button
@@ -791,11 +824,11 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
       {/* Empty State */}
       {sessionGroups.length === 0 && (
-        <Card className="p-12 text-center">
+        <Card className="p-12 text-center border-0 shadow-md rounded-2xl">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
             <Package className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">
+          <h3 className="text-lg font-bold mb-2">
             {activeTab === 'active' && 'No active orders'}
             {activeTab === 'completed' && 'No completed orders'}
             {activeTab === 'cancelled' && 'No cancelled orders'}
@@ -820,6 +853,8 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             </Button>
           )}
         </Card>
+      )}
+      </>
       )}
     </div>
   );
