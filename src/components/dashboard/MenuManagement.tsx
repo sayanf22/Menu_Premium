@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit2, Trash2, FolderPlus, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { Plus, Edit2, Trash2, FolderPlus, Loader2, AlertCircle, ScanSearch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -461,7 +461,7 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
           <Dialog open={aiImportOpen} onOpenChange={setAiImportOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="flex-1 sm:flex-none text-xs sm:text-sm gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-950/20">
-                <Sparkles className="h-4 w-4" />
+                <ScanSearch className="h-4 w-4" />
                 AI Import
               </Button>
             </DialogTrigger>

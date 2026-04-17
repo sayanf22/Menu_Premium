@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Sparkles, Upload, FileImage, CheckCircle2, AlertCircle,
+  ScanSearch, Upload, FileImage, CheckCircle2, AlertCircle,
   Loader2, ChevronDown, ChevronUp, Utensils, X, RefreshCw, Plus, Images
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { compressImage } from "@/lib/imageOptimization";
 
 interface SizeVariant { name: string; price: number; }
 interface ParsedItem {
@@ -129,15 +130,25 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
     setErrorMsg(null);
 
     try {
-      // Convert all images to base64
-      const imagePayloads = await Promise.all(images.map(async (img) => {
+      // Compress all images for optimal quality and smaller payload
+      const compressedImages = await Promise.all(images.map(async (img) => {
+        try {
+          const compressed = await compressImage(img.file, 'menu');
+          return compressed;
+        } catch {
+          return img.file; // fallback to original if compression fails
+        }
+      }));
+
+      // Convert compressed images to base64
+      const imagePayloads = await Promise.all(compressedImages.map(async (file) => {
         const base64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve((reader.result as string).split(",")[1]);
           reader.onerror = reject;
-          reader.readAsDataURL(img.file);
+          reader.readAsDataURL(file);
         });
-        return { base64, type: img.file.type };
+        return { base64, type: file.type };
       }));
 
       // Get existing item names for deduplication
@@ -281,7 +292,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="p-2.5 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
-          <Sparkles className="h-5 w-5 text-white" />
+          <ScanSearch className="h-5 w-5 text-white" />
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-base flex items-center gap-2 flex-wrap">
@@ -382,7 +393,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
                     disabled={creditsRemaining <= 0}
                     className="w-full h-12 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white font-semibold gap-2 shadow-lg shadow-violet-500/25 disabled:opacity-50"
                   >
-                    <Sparkles className="h-5 w-5" />
+                    <ScanSearch className="h-5 w-5" />
                     {creditsRemaining <= 0 ? "No credits remaining" : `Analyze ${images.length} Image${images.length !== 1 ? "s" : ""} with AI`}
                   </Button>
                 </motion.div>
@@ -406,7 +417,7 @@ const AIMenuImport = ({ restaurantId, onImportComplete }: AIMenuImportProps) => 
                 style={{ width: 80, height: 80, margin: -8 }}
               />
               <div className="w-16 h-16 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-violet-500 animate-pulse" />
+                <ScanSearch className="h-8 w-8 text-violet-500 animate-pulse" />
               </div>
             </div>
             <div className="text-center">
