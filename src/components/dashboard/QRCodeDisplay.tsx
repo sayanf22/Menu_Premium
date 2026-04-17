@@ -93,6 +93,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
   const [confirmSwitchMode, setConfirmSwitchMode] = useState<QRMode | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<number | null>(null);
   const [confirmEnable, setConfirmEnable] = useState<number | null>(null);
+  const [confirmSkipNum, setConfirmSkipNum] = useState<number | null>(null);
   const [confirmText, setConfirmText] = useState("");
 
   // QR style config
@@ -232,14 +233,40 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
         p_qr_mode: newMode,
         p_table_config: newConfig as any,
       });
-      if (error || (data as any)?.success === false) {
-        throw new Error((data as any)?.error || error?.message || 'Save failed');
+      
+      if (error) {
+        console.error('RPC error:', error);
+        throw new Error(error.message || 'Failed to save');
       }
+      
+      const result = data as any;
+      if (result?.success === false) {
+        throw new Error(result.error || 'Save failed');
+      }
+      
+      // Update local state only after confirmed DB save
       setQrMode(newMode);
       setTableConfig(newConfig);
-      toast({ title: "Saved", description: "Configuration updated successfully" });
+      toast({ title: "✅ Saved", description: "Configuration saved to database" });
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      console.error('Save config error:', err);
+      toast({ title: "Save Failed", description: err.message, variant: "destructive" });
+      // Reload from DB to ensure local state matches
+      const { data: fresh } = await supabase
+        .from("restaurants")
+        .select("qr_mode, table_config")
+        .eq("id", restaurantId)
+        .single();
+      if (fresh) {
+        setQrMode((fresh.qr_mode as QRMode) || 'single');
+        const tc = (fresh.table_config as any) || {};
+        setTableConfig({
+          total: tc.total || 10,
+          skip: Array.isArray(tc.skip) ? tc.skip : [],
+          disabled: Array.isArray(tc.disabled) ? tc.disabled : [],
+          custom_labels: tc.custom_labels || {},
+        });
+      }
     } finally {
       setSavingConfig(false);
     }
@@ -264,35 +291,33 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
     setConfirmText("");
   };
 
-  // Add new table/room (only add, never delete)
+  // Add new table/room (only add, never delete, cannot un-skip)
   const handleAddTable = () => {
     const num = parseInt(addInput.trim());
     if (isNaN(num) || num < 1 || num > 500) {
       toast({ title: "Invalid number", description: "Enter a number between 1 and 500", variant: "destructive" });
       return;
     }
-    // If within current total and not skipped, it already exists
-    if (num <= tableConfig.total && !tableConfig.skip.includes(num)) {
+    // If it was skipped, it's permanent — cannot be added back
+    if (tableConfig.skip.includes(num)) {
+      toast({ title: "Cannot add", description: `${locationLabel} ${num} was permanently skipped and cannot be restored`, variant: "destructive" });
+      setAddInput("");
+      return;
+    }
+    // If within current total, it already exists
+    if (num <= tableConfig.total) {
       toast({ title: `${locationLabel} ${num} already exists` });
       setAddInput("");
       return;
     }
-    // If it was skipped, un-skip it
-    if (tableConfig.skip.includes(num)) {
-      const newConfig = { ...tableConfig, skip: tableConfig.skip.filter(s => s !== num) };
-      if (num > tableConfig.total) newConfig.total = num;
-      saveConfig(qrMode, newConfig);
-      setAddInput("");
-      return;
-    }
     // Extend total to include this number
-    const newConfig = { ...tableConfig, total: Math.max(tableConfig.total, num) };
+    const newConfig = { ...tableConfig, total: num };
     saveConfig(qrMode, newConfig);
     setAddInput("");
   };
 
-  // Skip a number (permanent - hides from list but doesn't delete)
-  const handleSkip = () => {
+  // Skip a number — requires confirmation, PERMANENT (enforced server-side)
+  const handleSkipRequest = () => {
     const num = parseInt(skipInput.trim());
     if (isNaN(num) || num < 1 || num > tableConfig.total) {
       toast({ title: "Invalid", description: `Enter a number between 1 and ${tableConfig.total}`, variant: "destructive" });
@@ -302,9 +327,22 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
       toast({ title: "Already skipped" });
       return;
     }
-    const newConfig = { ...tableConfig, skip: [...tableConfig.skip, num].sort((a, b) => a - b) };
-    saveConfig(qrMode, newConfig);
+    // Show confirmation dialog
+    setConfirmSkipNum(num);
+    setConfirmText("");
     setSkipInput("");
+  };
+
+  const confirmSkipNumber = async () => {
+    if (!confirmSkipNum) return;
+    if (confirmText.toUpperCase() !== "CONFIRM") {
+      toast({ title: "Type CONFIRM to proceed", variant: "destructive" });
+      return;
+    }
+    const newConfig = { ...tableConfig, skip: [...tableConfig.skip, confirmSkipNum].sort((a, b) => a - b) };
+    await saveConfig(qrMode, newConfig);
+    setConfirmSkipNum(null);
+    setConfirmText("");
   };
 
   // Disable/enable QR (temporary stop - QR exists but won't work)
@@ -597,13 +635,13 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                   {/* Skip numbers */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Skip Numbers</Label>
-                    <p className="text-xs text-muted-foreground">Permanently hide numbers (e.g. 13, 113 for superstition)</p>
+                    <p className="text-xs text-red-500 dark:text-red-400 font-medium">⚠️ Permanent — skipped numbers cannot be restored</p>
                     <div className="flex gap-2">
                       <Input type="number" value={skipInput} onChange={(e) => setSkipInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSkip()}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSkipRequest()}
                         placeholder="e.g. 13" className="h-10 rounded-xl" />
                       <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
-                        <Button variant="outline" onClick={handleSkip} disabled={savingConfig} className="h-10 px-4 rounded-xl">
+                        <Button variant="outline" onClick={handleSkipRequest} disabled={savingConfig} className="h-10 px-4 rounded-xl">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </motion.div>
@@ -612,8 +650,8 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {tableConfig.skip.map(num => (
                           <motion.div key={num} initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                            <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs">
-                              {locationLabel} {num} (skipped)
+                            <Badge variant="secondary" className="rounded-full px-2.5 py-1 text-xs bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800">
+                              {locationLabel} {num} — permanently skipped
                             </Badge>
                           </motion.div>
                         ))}
@@ -841,6 +879,38 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
             <AlertDialogCancel className="rounded-xl" onClick={() => setConfirmEnable(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction className="rounded-xl bg-emerald-500 hover:bg-emerald-600" onClick={() => confirmEnable && handleEnableQR(confirmEnable)} disabled={savingConfig}>
               {savingConfig ? "Enabling..." : "Re-enable QR"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Skip Number Confirmation (PERMANENT) */}
+      <AlertDialog open={!!confirmSkipNum} onOpenChange={(o) => { if (!o) { setConfirmSkipNum(null); setConfirmText(""); } }}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Permanently Skip {locationLabel} {confirmSkipNum}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                  ⚠️ This action is PERMANENT and cannot be undone.
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {locationLabel} {confirmSkipNum} will be permanently removed from your list. It cannot be added back or restored. The QR code for this number will stop working forever.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Type <span className="font-bold text-red-600">CONFIRM</span> to permanently skip:</Label>
+                <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="CONFIRM" className="font-mono rounded-xl border-red-300 focus:border-red-500 focus:ring-red-500" autoComplete="off" />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => { setConfirmSkipNum(null); setConfirmText(""); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="rounded-xl bg-red-500 hover:bg-red-600 text-white" onClick={confirmSkipNumber} disabled={savingConfig || confirmText.toUpperCase() !== "CONFIRM"}>
+              {savingConfig ? "Skipping..." : `Permanently Skip ${locationLabel} ${confirmSkipNum}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
