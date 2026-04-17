@@ -167,10 +167,11 @@ const Auth = () => {
     e.preventDefault();
     try {
       authSchema.parse({ email, password, name: restaurantName });
-      // If plan is preselected via URL, skip plan selection and go directly to payment
-      if (preselectedPlan && selectedPlanId) {
+      // If plan is already selected (preselected via URL or previously chosen), go straight to payment
+      if (selectedPlanId) {
         handleRegisterAndPay(selectedPlanId);
       } else {
+        // No plan selected yet — show plan selection step
         setSignUpStep("plan");
       }
     } catch (error: any) {
@@ -436,7 +437,7 @@ const Auth = () => {
               onClick={() => setSignUpStep("form")} 
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
             >
-              <ArrowLeft className="h-4 w-4" /> Back
+              <ArrowLeft className="h-4 w-4" /> Back to form
             </button>
 
             {/* Account info */}
@@ -514,7 +515,16 @@ const Auth = () => {
                     </div>
 
                     <Button
-                      onClick={() => handleRegisterAndPay(plan.id)}
+                      onClick={() => {
+                        setSelectedPlanId(plan.id);
+                        // If form is already filled (email + password + name), go straight to payment
+                        // Otherwise go back to form with plan pre-selected
+                        if (email && password && restaurantName) {
+                          handleRegisterAndPay(plan.id);
+                        } else {
+                          setSignUpStep("form");
+                        }
+                      }}
                       disabled={loading && selectedPlanId === plan.id}
                       className={`w-full rounded-full h-11 ${
                         isPopular 
@@ -524,8 +534,10 @@ const Auth = () => {
                     >
                       {loading && selectedPlanId === plan.id ? (
                         <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing...</>
-                      ) : (
+                      ) : email && password && restaurantName ? (
                         <><CreditCard className="h-4 w-4 mr-2" /> Pay & Create Account</>
+                      ) : (
+                        <><Check className="h-4 w-4 mr-2" /> Select {plan.name}</>
                       )}
                     </Button>
                   </div>
@@ -645,8 +657,8 @@ const Auth = () => {
 
           {activeTab === "signup" ? (
             <form onSubmit={handleSignUpFormSubmit} className="space-y-4">
-              {/* Show selected plan when preselected via URL */}
-              {preselectedPlan && selectedPlanId && plans.length > 0 && (() => {
+              {/* Show selected plan card when a plan is selected */}
+              {selectedPlanId && plans.length > 0 && (() => {
                 const plan = plans.find(p => p.id === selectedPlanId);
                 if (!plan) return null;
                 const price = isYearly ? plan.price_yearly : plan.price_monthly;
@@ -674,7 +686,7 @@ const Auth = () => {
                         <span className="text-gray-500 text-sm">/{isYearly ? 'yr' : 'mo'}</span>
                       </div>
                     </div>
-                    {/* Billing toggle for preselected plan */}
+                    {/* Billing toggle + Change plan */}
                     <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-orange-200/50">
                       <button
                         type="button"
@@ -696,8 +708,8 @@ const Auth = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setPreselectedPlan(null); }}
-                        className="ml-2 text-xs text-gray-400 hover:text-orange-500 underline"
+                        onClick={() => { setPreselectedPlan(null); setSignUpStep("plan"); }}
+                        className="ml-2 text-xs text-orange-500 hover:text-orange-600 font-medium underline underline-offset-2"
                       >
                         Change plan
                       </button>
