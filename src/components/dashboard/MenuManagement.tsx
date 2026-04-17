@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { uploadToR2WithProgress, validateFile, deleteFromR2, isR2Url } from "@/lib/r2Upload";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import AIMenuImport from "./AIMenuImport";
 
 interface MenuItem {
@@ -444,6 +445,47 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Skeleton loading state */}
+      {loading && menuItems.length === 0 ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-52 rounded-xl" />
+              <Skeleton className="h-4 w-80 rounded-lg" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-24 rounded-xl" />
+              <Skeleton className="h-10 w-24 rounded-xl" />
+              <Skeleton className="h-10 w-20 rounded-xl" />
+            </div>
+          </div>
+          <Skeleton className="h-20 w-full rounded-2xl" />
+          <Skeleton className="h-8 w-32 rounded-xl" />
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="rounded-2xl overflow-hidden border-0 shadow-md">
+                <Skeleton className="h-48 w-full" />
+                <div className="p-4 space-y-3">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-5 w-36 rounded-lg" />
+                    <Skeleton className="h-5 w-16 rounded-lg" />
+                  </div>
+                  <Skeleton className="h-4 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-3/4 rounded-lg" />
+                  <div className="flex justify-between pt-2">
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Menu Management</h2>
@@ -745,8 +787,8 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
             <h3 className="text-xl md:text-2xl font-extrabold tracking-tight capitalize text-zinc-900 dark:text-white">{category.name}</h3>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {groupedItems[category.id].map((item) => (
-                <Card key={item.id} className="overflow-hidden hover:shadow-[var(--shadow-medium)] transition-all duration-300">
-                  <div className="relative h-48">
+                <Card key={item.id} className="overflow-hidden border-0 shadow-md hover:shadow-xl rounded-2xl transition-all duration-300">
+                  <div className="relative h-48 overflow-hidden">
                     <img 
                       src={item.image_url} 
                       alt={item.name}
@@ -826,8 +868,8 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
           <h3 className="text-2xl font-bold">Uncategorized</h3>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {uncategorizedItems.map((item) => (
-              <Card key={item.id} className="overflow-hidden hover:shadow-[var(--shadow-medium)] transition-all duration-300">
-                <div className="relative h-48">
+              <Card key={item.id} className="overflow-hidden border-0 shadow-md hover:shadow-xl rounded-2xl transition-all duration-300">
+                <div className="relative h-48 overflow-hidden">
                   <img 
                     src={item.image_url} 
                     alt={item.name}
@@ -901,14 +943,16 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
         </div>
       )}
 
-      {menuItems.length === 0 && (
-        <Card className="p-12 text-center">
+      {menuItems.length === 0 && !loading && (
+        <Card className="p-12 text-center border-0 shadow-md rounded-2xl">
           <p className="text-muted-foreground mb-4">No menu items yet</p>
           <Button variant="hero" onClick={() => setDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Your First Item
           </Button>
         </Card>
+      )}
+      </>
       )}
     </div>
   );
