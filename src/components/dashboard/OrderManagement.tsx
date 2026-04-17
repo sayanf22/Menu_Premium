@@ -62,7 +62,7 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
   // Filter states
   const [activeTab, setActiveTab] = useState<FilterTab>('active');
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'all'>('today');
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
 
   useEffect(() => {
     fetchOrders();
@@ -190,14 +190,13 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfWeek.getDate() - 7);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     return orders.filter(order => {
       const orderDate = new Date(order.created_at);
-      if (dateFilter === 'today') {
-        return orderDate >= startOfToday;
-      } else if (dateFilter === 'week') {
-        return orderDate >= startOfWeek;
-      }
+      if (dateFilter === 'today') return orderDate >= startOfToday;
+      if (dateFilter === 'week') return orderDate >= startOfWeek;
+      if (dateFilter === 'month') return orderDate >= startOfMonth;
       return true;
     });
   }, [orders, dateFilter]);
@@ -363,27 +362,32 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
     });
   };
 
-  // Stats based on all orders (not filtered)
-  const activeOrdersCount = orders.filter(o => ['pending', 'accepted', 'preparing'].includes(o.status)).length;
-  const completedOrdersCount = orders.filter(o => o.status === 'completed').length;
-  const cancelledOrdersCount = orders.filter(o => o.status === 'rejected' || o.status === 'cancelled').length;
-  const todayRevenue = useMemo(() => {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return orders
-      .filter(o => new Date(o.created_at) >= startOfToday)
+  // Stats based on filtered orders (respects date filter)
+  const activeOrdersCount = filteredByDate.filter(o => ['pending', 'accepted', 'preparing'].includes(o.status)).length;
+  const completedOrdersCount = filteredByDate.filter(o => o.status === 'completed').length;
+  const cancelledOrdersCount = filteredByDate.filter(o => o.status === 'rejected' || o.status === 'cancelled').length;
+  
+  // Revenue from completed orders in the selected date range
+  const filteredRevenue = useMemo(() => {
+    return filteredByDate
+      .filter(o => o.status === 'completed')
       .reduce((sum, o) => {
         const orderTotal = o.items?.items?.reduce((s: number, item: any) => 
           s + ((item.price || 0) * (item.quantity || 1)), 0) || 0;
         return sum + orderTotal;
       }, 0);
-  }, [orders]);
+  }, [filteredByDate]);
+
+  // Total orders count (all time, for the "All Orders" tab)
+  const totalOrdersCount = orders.length;
+
+  const dateLabel = dateFilter === 'today' ? "Today's" : dateFilter === 'week' ? "This Week's" : dateFilter === 'month' ? "This Month's" : "Total";
 
   const tabs: { id: FilterTab; label: string; count: number }[] = [
     { id: 'active', label: 'Active', count: activeOrdersCount },
     { id: 'completed', label: 'Completed', count: completedOrdersCount },
     { id: 'cancelled', label: 'Cancelled', count: cancelledOrdersCount },
-    { id: 'all', label: 'All Orders', count: orders.length },
+    { id: 'all', label: 'All Orders', count: filteredByDate.length },
   ];
 
   return (
@@ -477,8 +481,8 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-2xl font-extrabold">₹{todayRevenue.toFixed(0)}</p>
-              <p className="text-xs text-muted-foreground font-medium">Today's Revenue</p>
+              <p className="text-2xl font-extrabold">₹{filteredRevenue.toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground font-medium">{dateLabel} Revenue</p>
             </div>
           </div>
         </Card>
@@ -545,6 +549,14 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
               className="rounded-full shadow-sm"
             >
               This Week
+            </Button>
+            <Button
+              variant={dateFilter === 'month' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDateFilter('month')}
+              className="rounded-full shadow-sm"
+            >
+              This Month
             </Button>
             <Button
               variant={dateFilter === 'all' ? 'default' : 'outline'}
