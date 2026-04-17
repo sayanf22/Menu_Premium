@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Instagram, Facebook, Twitter, Globe, Edit2 } from "lucide-react";
@@ -23,6 +24,7 @@ const SocialLinksForm = ({ restaurantId }: Props) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [links, setLinks] = useState<SocialLinks>({});
 
   const formatINR = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value);
@@ -32,12 +34,16 @@ const SocialLinksForm = ({ restaurantId }: Props) => {
   }, [restaurantId]);
 
   const fetchLinks = async () => {
-    const { data, error } = await supabase
-      .from("restaurants")
-      .select("social_links")
-      .eq("id", restaurantId)
-      .maybeSingle();
-    if (!error && data?.social_links) setLinks(data.social_links as SocialLinks);
+    try {
+      const { data, error } = await supabase
+        .from("restaurants")
+        .select("social_links")
+        .eq("id", restaurantId)
+        .maybeSingle();
+      if (!error && data?.social_links) setLinks(data.social_links as SocialLinks);
+    } finally {
+      setInitialLoading(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -60,8 +66,29 @@ const SocialLinksForm = ({ restaurantId }: Props) => {
 
   const hasAny = links.instagram || links.facebook || links.twitter || links.website;
 
+  if (initialLoading) {
+    return (
+      <Card className="shadow-md rounded-2xl border-0 overflow-hidden">
+        <CardHeader className="p-5">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-28" />
+            <Skeleton className="h-9 w-16 rounded-md" />
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 pt-0">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-5 w-5 rounded-full" />
+            <Skeleton className="h-5 w-5 rounded-full" />
+            <Skeleton className="h-5 w-5 rounded-full" />
+            <Skeleton className="h-5 w-5 rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="overflow-hidden">
+    <Card className="shadow-md rounded-2xl border-0 overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between p-5">
         <CardTitle className="text-base">Social Media</CardTitle>
         <Dialog open={open} onOpenChange={setOpen}>

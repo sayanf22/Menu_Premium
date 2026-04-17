@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Star, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +24,7 @@ interface FeedbackViewProps {
 const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
   const { toast } = useToast();
   const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchFeedback();
@@ -50,6 +52,8 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
         description: "Failed to load feedback",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,6 +74,34 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="grid gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="shadow-md rounded-2xl border-0 p-5">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-16 ml-auto" />
+                </div>
+              </div>
+              <Skeleton className="h-16 w-full mt-4 rounded-lg" />
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -79,7 +111,7 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
 
       <div className="grid gap-4">
         {feedback.map((item) => (
-          <Card key={item.id} className="hover:shadow-[var(--shadow-medium)] transition-all duration-300">
+          <Card key={item.id} className="shadow-md rounded-2xl border-0 hover:shadow-[var(--shadow-medium)] transition-all duration-300">
             <CardHeader className="p-5">
               <div className="flex justify-between items-start">
                 <div>
@@ -112,7 +144,7 @@ const FeedbackView = ({ restaurantId }: FeedbackViewProps) => {
       </div>
 
       {feedback.length === 0 && (
-        <Card className="p-12 text-center">
+        <Card className="shadow-md rounded-2xl border-0 p-12 text-center">
           <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-lg text-muted-foreground">No feedback yet</p>
           <p className="text-sm text-muted-foreground mt-2">

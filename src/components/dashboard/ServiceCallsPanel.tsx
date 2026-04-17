@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useBusinessType } from "@/hooks/useBusinessType";
 import { Bell, User, Droplets, Receipt, Check, Clock } from "lucide-react";
@@ -290,11 +291,29 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
 
   if (loading) {
     return (
-      <Card className="p-6">
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Skeleton className="w-10 h-10 rounded-xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-24" />
+          </div>
         </div>
-      </Card>
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="shadow-md rounded-2xl border-0 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-12 h-12 rounded-xl" />
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+              </div>
+              <Skeleton className="h-9 w-20 rounded-md" />
+            </div>
+          </Card>
+        ))}
+      </div>
     );
   }
 
@@ -322,7 +341,7 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
 
       {/* Calls List */}
       {calls.length === 0 ? (
-        <Card className="p-8 text-center">
+        <Card className="p-8 text-center shadow-md rounded-2xl border-0">
           <Bell className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
           <p className="text-muted-foreground">No service requests</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -346,7 +365,7 @@ const ServiceCallsPanel = ({ restaurantId, onNewCall }: ServiceCallsPanelProps) 
                   exit={{ opacity: 0, x: 100, scale: 0.95 }}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 >
-                  <Card className={`overflow-hidden ${isPending ? "ring-2 ring-orange-500 shadow-lg" : ""}`}>
+                  <Card className={`overflow-hidden shadow-md rounded-2xl border-0 ${isPending ? "ring-2 ring-orange-500 shadow-lg" : ""}`}>
                     <div className={`p-4 ${config.lightBg}`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
