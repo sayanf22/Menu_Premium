@@ -8,8 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useBusinessType } from "@/hooks/useBusinessType";
 import { 
   Clock, Package, Bell, RefreshCw, ChevronDown, ChevronUp, 
-  Users, ShoppingBag, Receipt, CheckCircle2, Timer, Utensils,
-  Search, Filter, Calendar, TrendingUp, X, XCircle, ChefHat, AlertCircle
+  Receipt, CheckCircle2, Timer, Utensils,
+  Search, Calendar, TrendingUp, X, XCircle, ChefHat
 } from "lucide-react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";

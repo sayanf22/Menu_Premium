@@ -1,12 +1,12 @@
 ﻿import { useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ScanSearch, Upload, FileImage, CheckCircle2, AlertCircle,
+  ScanSearch, CheckCircle2, AlertCircle,
   Loader2, ChevronDown, ChevronUp, Utensils, X, RefreshCw, Plus, Images
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";

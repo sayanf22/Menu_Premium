@@ -14,7 +14,7 @@ import {
   Download, QrCode as QrIcon, ExternalLink, Copy, Check, Smartphone, Printer,
   Palette, Circle, Square, Diamond, Hexagon, Star, Settings2, RotateCcw,
   Grid3X3, LayoutGrid, Plus, X, ChevronDown, ChevronUp, Layers, Table2,
-  PauseCircle, PlayCircle, AlertTriangle, Lock, Unlock, Eye, EyeOff
+  PauseCircle, PlayCircle, AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -549,10 +549,10 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                         <CardContent className="p-5">
                           <h3 className="font-semibold text-sm mb-3">Quick Tips</h3>
                           <ul className="space-y-1.5 text-sm text-muted-foreground">
-                            <li>• Print on white paper for best contrast</li>
-                            <li>• Minimum 2×2 inches for table placement</li>
-                            <li>• Test scan before printing in bulk</li>
-                            <li>• Place in well-lit, visible areas</li>
+                            <li>ï¿½ Print on white paper for best contrast</li>
+                            <li>ï¿½ Minimum 2ï¿½2 inches for table placement</li>
+                            <li>ï¿½ Test scan before printing in bulk</li>
+                            <li>ï¿½ Place in well-lit, visible areas</li>
                           </ul>
                         </CardContent>
                       </Card>
@@ -590,7 +590,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                       </motion.div>
                     </div>
                     <p className="text-xs text-muted-foreground font-medium">
-                      Currently: {locationLabel}s 1–{tableConfig.total} ({activeTableNumbers.length} active)
+                      Currently: {locationLabel}s 1ï¿½{tableConfig.total} ({activeTableNumbers.length} active)
                     </p>
                   </div>
 
@@ -660,7 +660,7 @@ const QRCodeDisplay = ({ restaurantId }: QRCodeDisplayProps) => {
                         {tableConfig.disabled.includes(selectedTable) && (
                           <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 flex items-center gap-2">
                             <PauseCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                            <p className="text-xs text-amber-700 dark:text-amber-400">QR is stopped — customers cannot scan this</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400">QR is stopped ï¿½ customers cannot scan this</p>
                           </div>
                         )}
                       </motion.div>
