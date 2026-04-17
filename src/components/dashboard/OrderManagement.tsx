@@ -438,9 +438,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => setActiveTab('active')}>
+        <Card className="p-4 bg-orange-50 dark:bg-orange-950/40 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => setActiveTab('active')}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-orange-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-orange-100 dark:bg-orange-900/50 shadow-sm">
               <Timer className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <div>
@@ -449,9 +449,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
+        <Card className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => { setActiveTab('completed'); setDateFilter('all'); }}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 shadow-sm">
               <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
@@ -460,9 +460,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-500/5 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => { setActiveTab('cancelled'); setDateFilter('all'); }}>
+        <Card className="p-4 bg-red-50 dark:bg-red-950/40 border-0 shadow-md rounded-2xl cursor-pointer hover:shadow-lg transition-all" onClick={() => { setActiveTab('cancelled'); setDateFilter('all'); }}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-red-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-red-100 dark:bg-red-900/50 shadow-sm">
               <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
@@ -471,9 +471,9 @@ const OrderManagement = ({ restaurantId, newOrderTrigger, isVisible }: OrderMana
             </div>
           </div>
         </Card>
-        <Card className="p-4 bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-0 shadow-md rounded-2xl">
+        <Card className="p-4 bg-blue-50 dark:bg-blue-950/40 border-0 shadow-md rounded-2xl">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/50 shadow-sm">
               <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>

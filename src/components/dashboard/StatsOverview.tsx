@@ -174,9 +174,9 @@ const StatsOverview = ({ restaurantId }: StatsOverviewProps) => {
       {/* Primary Stats — Today's Performance */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Today's Revenue */}
-        <Card className="border-0 shadow-md rounded-2xl p-5 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 hover:shadow-lg transition-all">
+        <Card className="border-0 shadow-md rounded-2xl p-5 bg-emerald-50 dark:bg-emerald-950/40 hover:shadow-lg transition-all">
           <div className="flex items-center justify-between mb-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 shadow-sm">
               <IndianRupee className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             {revenueChange !== 0 && (
@@ -191,9 +191,9 @@ const StatsOverview = ({ restaurantId }: StatsOverviewProps) => {
         </Card>
 
         {/* Today's Orders */}
-        <Card className="border-0 shadow-md rounded-2xl p-5 bg-gradient-to-br from-blue-500/10 to-blue-500/5 hover:shadow-lg transition-all">
+        <Card className="border-0 shadow-md rounded-2xl p-5 bg-blue-50 dark:bg-blue-950/40 hover:shadow-lg transition-all">
           <div className="flex items-center justify-between mb-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-900/50 shadow-sm">
               <ShoppingBag className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             {ordersChange !== 0 && (
@@ -208,9 +208,9 @@ const StatsOverview = ({ restaurantId }: StatsOverviewProps) => {
         </Card>
 
         {/* Active Orders */}
-        <Card className="border-0 shadow-md rounded-2xl p-5 bg-gradient-to-br from-orange-500/10 to-orange-500/5 hover:shadow-lg transition-all">
+        <Card className="border-0 shadow-md rounded-2xl p-5 bg-orange-50 dark:bg-orange-950/40 hover:shadow-lg transition-all">
           <div className="flex items-center justify-between mb-3">
-            <div className="p-2.5 rounded-xl bg-orange-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-orange-100 dark:bg-orange-900/50 shadow-sm">
               <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             {stats.activeOrders > 0 && (
@@ -225,9 +225,9 @@ const StatsOverview = ({ restaurantId }: StatsOverviewProps) => {
         </Card>
 
         {/* Menu Views */}
-        <Card className="border-0 shadow-md rounded-2xl p-5 bg-gradient-to-br from-violet-500/10 to-violet-500/5 hover:shadow-lg transition-all">
+        <Card className="border-0 shadow-md rounded-2xl p-5 bg-violet-50 dark:bg-violet-950/40 hover:shadow-lg transition-all">
           <div className="flex items-center justify-between mb-3">
-            <div className="p-2.5 rounded-xl bg-violet-500/20 shadow-sm">
+            <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/50 shadow-sm">
               <Eye className="h-5 w-5 text-violet-600 dark:text-violet-400" />
             </div>
           </div>
