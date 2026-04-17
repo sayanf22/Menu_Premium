@@ -36,6 +36,7 @@ import SubscriptionManagement from "@/components/dashboard/SubscriptionManagemen
 import ServiceCallsPanel from "@/components/dashboard/ServiceCallsPanel";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useBusinessType } from "@/hooks/useBusinessType";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Order {
   id: string;
@@ -97,6 +98,7 @@ const DashboardWithSidebar = () => {
   const [lastViewCount, setLastViewCount] = useState(0);
   const [isRestaurantDisabled, setIsRestaurantDisabled] = useState(false);
   const [activeTab, setActiveTab] = useState("stats");
+  const [tabTransitioning, setTabTransitioning] = useState(false);
   const [open, setOpen] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,8 +109,12 @@ const DashboardWithSidebar = () => {
 
   // Helper to handle tab change and close mobile sidebar
   const handleTabChange = (tab: string) => {
+    if (tab === activeTab) return;
+    setTabTransitioning(true);
     setActiveTab(tab);
     setOpen(false); // Close mobile sidebar
+    // Brief skeleton then show content
+    setTimeout(() => setTabTransitioning(false), 150);
   };
 
   const links = [
@@ -981,6 +987,7 @@ const DashboardWithSidebar = () => {
         onNewOrder={handleNewOrder}
         newOrderTrigger={lastNewOrder}
         onNewServiceCall={handleNewServiceCall}
+        tabTransitioning={tabTransitioning}
       />
     </div>
   );
@@ -1024,13 +1031,15 @@ const Dashboard = ({
   restaurantId, 
   onNewOrder,
   newOrderTrigger,
-  onNewServiceCall
+  onNewServiceCall,
+  tabTransitioning
 }: { 
   activeTab: string; 
   restaurantId: string;
   onNewOrder: (order: Order) => void;
   newOrderTrigger: Order | null;
   onNewServiceCall: (call: ServiceCall) => void;
+  tabTransitioning: boolean;
 }) => {
   console.log('🎨 Dashboard render:', { activeTab, hasNewOrder: !!newOrderTrigger });
   return (
@@ -1038,25 +1047,51 @@ const Dashboard = ({
       <div className="p-4 md:p-8 lg:p-10 md:rounded-tl-2xl border-t md:border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex-1 w-full overflow-y-auto">
         {/* Centered content container with max-width */}
         <div className="max-w-6xl mx-auto w-full">
-          {activeTab === "stats" && <StatsOverview restaurantId={restaurantId} />}
-          {activeTab === "menu" && <MenuManagement restaurantId={restaurantId} />}
-          
-          {/* Always render OrderManagement to maintain realtime subscription */}
-          <div style={{ display: activeTab === "orders" ? "block" : "none" }}>
-            <OrderManagement 
-              restaurantId={restaurantId}
-              onNewOrder={onNewOrder}
-              newOrderTrigger={newOrderTrigger}
-              isVisible={activeTab === "orders"}
-            />
-          </div>
-          
-          {activeTab === "feedback" && <FeedbackView restaurantId={restaurantId} />}
-          {activeTab === "service-calls" && <ServiceCallsPanel restaurantId={restaurantId} onNewCall={(call) => onNewServiceCall(call as ServiceCall)} />}
-          {activeTab === "social" && <SocialLinksForm restaurantId={restaurantId} />}
-          {activeTab === "qr" && <QRCodeDisplay restaurantId={restaurantId} />}
-          {activeTab === "subscription" && <SubscriptionManagement />}
-          {activeTab === "profile" && <RestaurantProfile restaurantId={restaurantId} />}
+          {/* Skeleton screen during tab transition */}
+          {tabTransitioning ? (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-48 rounded-xl" />
+                  <Skeleton className="h-4 w-72 rounded-lg" />
+                </div>
+                <Skeleton className="h-10 w-28 rounded-xl" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-24 rounded-2xl" />
+                ))}
+              </div>
+              <Skeleton className="h-12 w-full rounded-2xl" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <Skeleton key={i} className="h-64 rounded-2xl" />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === "stats" && <StatsOverview restaurantId={restaurantId} />}
+              {activeTab === "menu" && <MenuManagement restaurantId={restaurantId} />}
+              
+              {/* Always render OrderManagement to maintain realtime subscription */}
+              <div style={{ display: activeTab === "orders" ? "block" : "none" }}>
+                <OrderManagement 
+                  restaurantId={restaurantId}
+                  onNewOrder={onNewOrder}
+                  newOrderTrigger={newOrderTrigger}
+                  isVisible={activeTab === "orders"}
+                />
+              </div>
+              
+              {activeTab === "feedback" && <FeedbackView restaurantId={restaurantId} />}
+              {activeTab === "service-calls" && <ServiceCallsPanel restaurantId={restaurantId} onNewCall={(call) => onNewServiceCall(call as ServiceCall)} />}
+              {activeTab === "social" && <SocialLinksForm restaurantId={restaurantId} />}
+              {activeTab === "qr" && <QRCodeDisplay restaurantId={restaurantId} />}
+              {activeTab === "subscription" && <SubscriptionManagement />}
+              {activeTab === "profile" && <RestaurantProfile restaurantId={restaurantId} />}
+            </>
+          )}
         </div>
       </div>
     </div>

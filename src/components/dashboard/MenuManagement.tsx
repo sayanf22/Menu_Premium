@@ -715,23 +715,26 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
       )}
 
       {categories.length > 0 && (
-        <Card className="p-4 md:p-6">
-          <h3 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Menu Categories</h3>
-          <div className="flex flex-wrap gap-2 md:gap-3">
-            {categories.map(cat => (
-              <div key={cat.id} className="flex items-center gap-1.5 md:gap-2 bg-primary/10 text-primary px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg border border-primary/20 text-sm md:text-base">
-                <span className="font-medium">{cat.name}</span>
-                <span className="text-xs md:text-sm opacity-70">({groupedItems[cat.id]?.length || 0})</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-5 w-5 md:h-6 md:w-6 hover:bg-destructive/20 hover:text-destructive"
-                  onClick={() => deleteCategory(cat.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
+        <Card className="p-4 md:p-6 border-0 shadow-md rounded-2xl">
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Categories</h3>
+          <div className="flex flex-wrap gap-2">
+            {categories.map(cat => {
+              const count = groupedItems[cat.id]?.length || 0;
+              return (
+                <div key={cat.id} className="flex items-center gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-3 py-2 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                  <span className="font-semibold text-sm text-zinc-800 dark:text-zinc-200 capitalize">{cat.name}</span>
+                  <span className="text-xs text-muted-foreground bg-zinc-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded-full font-medium">{count}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-5 w-5 hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-950/30 rounded-full"
+                    onClick={() => deleteCategory(cat.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}
@@ -739,7 +742,7 @@ const MenuManagement = ({ restaurantId }: MenuManagementProps) => {
       {categories.map(category => (
         groupedItems[category.id]?.length > 0 && (
           <div key={category.id} className="space-y-4">
-            <h3 className="text-2xl font-bold">{category.name}</h3>
+            <h3 className="text-xl md:text-2xl font-extrabold tracking-tight capitalize text-zinc-900 dark:text-white">{category.name}</h3>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {groupedItems[category.id].map((item) => (
                 <Card key={item.id} className="overflow-hidden hover:shadow-[var(--shadow-medium)] transition-all duration-300">
